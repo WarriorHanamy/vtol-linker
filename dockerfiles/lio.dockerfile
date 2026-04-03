@@ -44,15 +44,15 @@ RUN test -f ${OPENSSL_CRYPTO_LIBRARY} && test -f ${OPENSSL_SSL_LIBRARY}
 
 WORKDIR ${WS_DIR}/src
 
-COPY vtol_deployment/linker/lidar_connector/Livox-SDK2 /tmp/Livox-SDK2
+COPY lidar_connector/Livox-SDK2 /tmp/Livox-SDK2
 RUN cd /tmp/Livox-SDK2 && \
     mkdir -p build && cd build && \
     cmake .. && make -j$(nproc) && make install && \
     ldconfig && \
     rm -rf /tmp/Livox-SDK2
 
-COPY vtol_deployment/linker/lidar_connector/livox_ros_driver2 ./livox_ros_driver2
-COPY vtol_deployment/linker/lidar_connector/FAST_LIO_ROS2 ./FAST_LIO_ROS2
+COPY lidar_connector/livox_ros_driver2 ./livox_ros_driver2
+COPY lidar_connector/FAST_LIO_ROS2 ./FAST_LIO_ROS2
 
 WORKDIR ${WS_DIR}
 SHELL ["/bin/bash", "-c"]
@@ -66,7 +66,7 @@ RUN rm -rf ${WS_DIR}/build ${WS_DIR}/install ${WS_DIR}/log && \
     --cmake-args -DHUMBLE_ROS=ON -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} -DOPENSSL_CRYPTO_LIBRARY=${OPENSSL_CRYPTO_LIBRARY} -DOPENSSL_SSL_LIBRARY=${OPENSSL_SSL_LIBRARY} -DCMAKE_LIBRARY_PATH=${CMAKE_LIBRARY_PATH} -DCMAKE_INCLUDE_PATH=${CMAKE_INCLUDE_PATH} \
     --parallel-workers 4
 
-COPY vtol_deployment/linker/dockerfiles/ros_entrypoint.sh /ros_entrypoint.sh
+COPY dockerfiles/ros_entrypoint.sh /ros_entrypoint.sh
 RUN chmod +x /ros_entrypoint.sh
 
 CMD ["ros2", "launch", "fast_lio", "mapping.launch.py", "config_file:=mid360.yaml", "rviz:=false"]

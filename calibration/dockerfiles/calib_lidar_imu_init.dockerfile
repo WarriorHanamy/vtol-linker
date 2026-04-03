@@ -103,7 +103,7 @@ RUN pip3 install --no-cache-dir matplotlib
 
 WORKDIR ${WS_DIR}/src
 
-COPY vtol_deployment/linker/calibration/LiDAR_IMU_Init ./LiDAR_IMU_Init
+COPY calibration/LiDAR_IMU_Init ./LiDAR_IMU_Init
 
 RUN cd /tmp && \
     wget -q "https://github.com/Livox-SDK/livox_ros_driver/archive/refs/tags/v${LIVOX_DRIVER_VERSION}.tar.gz" && \
@@ -121,10 +121,10 @@ RUN sed -i '/^target_link_libraries(li_init/i add_dependencies(li_init ${${PROJE
 
 RUN mkdir -p /data ${WS_DIR}/src/LiDAR_IMU_Init/result
 
-COPY vtol_deployment/linker/calibration/dockerfiles/calib_entrypoint.sh /calib_entrypoint.sh
+COPY calibration/dockerfiles/calib_entrypoint.sh /calib_entrypoint.sh
 RUN chmod +x /calib_entrypoint.sh
 
-COPY vtol_deployment/scripts/calib_run.sh /usr/local/bin/calib_run.sh
+COPY calibration/dockerfiles/calib_run.sh /usr/local/bin/calib_run.sh
 RUN chmod +x /usr/local/bin/calib_run.sh
 
 ENTRYPOINT ["/calib_entrypoint.sh"]

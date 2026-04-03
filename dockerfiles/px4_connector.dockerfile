@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/agent
-COPY vtol_deployment/linker/px4_connector/Micro-XRCE-DDS-Agent ./Micro-XRCE-DDS-Agent
+COPY px4_connector/Micro-XRCE-DDS-Agent ./Micro-XRCE-DDS-Agent
 RUN cd Micro-XRCE-DDS-Agent && \
     mkdir build && cd build && \
     cmake .. && \
@@ -29,10 +29,10 @@ RUN cd Micro-XRCE-DDS-Agent && \
 WORKDIR ${WS_DIR}/src
 
 # Todo, the multiple places dependencies on px4_msgs.
-COPY vtol_deployment/linker/px4_connector/px4_msgs ./px4_msgs
-COPY vtol_deployment/linker/px4_connector/px4_msgs_overlay/CMakeLists.txt ./px4_msgs/CMakeLists.txt
-COPY vtol_deployment/linker/px4_connector/px4_msgs_overlay/package.xml ./px4_msgs/package.xml
-COPY vtol_deployment/linker/px4_connector/src/px4_odometry_bridge ./px4_odometry_bridge
+COPY px4_connector/px4_msgs ./px4_msgs
+COPY px4_connector/px4_msgs_overlay/CMakeLists.txt ./px4_msgs/CMakeLists.txt
+COPY px4_connector/px4_msgs_overlay/package.xml ./px4_msgs/package.xml
+COPY px4_connector/src/px4_odometry_bridge ./px4_odometry_bridge
 
 WORKDIR ${WS_DIR}
 SHELL ["/bin/bash", "-c"]
@@ -43,7 +43,7 @@ RUN rm -rf ${WS_DIR}/build ${WS_DIR}/install ${WS_DIR}/log && \
     --packages-select px4_msgs px4_odometry_bridge \
     --parallel-workers 4
 
-COPY vtol_deployment/linker/dockerfiles/px4_connector_entrypoint.sh /px4_connector_entrypoint.sh
+COPY dockerfiles/px4_connector_entrypoint.sh /px4_connector_entrypoint.sh
 RUN chmod +x /px4_connector_entrypoint.sh
 
 ENTRYPOINT ["/px4_connector_entrypoint.sh"]
