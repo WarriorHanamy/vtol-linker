@@ -11,9 +11,11 @@ PLAY_RATE ?=
 # Deployment configuration (fixed convention)
 HOST_IP := 192.168.55.100
 DEVICE_IP := 192.168.55.1
-DEVICE_USER := $(USER)
-IMAGE_DIR := $(CURDIR)/images
+DEVICE_USER := nv
+IMAGE_DIR := /tmp/vtol-images
 REMOTE_DIR := /tmp/vtol-images
+SSH_KEY := ~/.ssh/id_ed25519
+SSH_OPTS := $(if $(wildcard $(SSH_KEY)),-i $(SSH_KEY),)
 
 CALIB_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-$(IMAGE_SUFFIX):latest
 LIO_IMAGE := $(IMAGE_PREFIX)/lio-$(IMAGE_SUFFIX):latest
@@ -113,12 +115,12 @@ export-images: check-network
 
 transfer-images: export-images
 	@echo "[INFO] Transferring images to $(DEVICE_USER)@$(DEVICE_IP)..."
-	@ssh $(DEVICE_USER)@$(DEVICE_IP) "mkdir -p $(REMOTE_DIR)"
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "mkdir -p $(REMOTE_DIR)"
 	@for file in $(IMAGE_DIR)/*.tar $(IMAGE_DIR)/checksums.sha256 $(IMAGE_DIR)/manifest.txt; do \
 		if [ -f "$$file" ]; then \
 			filename=$$(basename "$$file"); \
 			echo "[INFO] Transferring: $$filename"; \
-			scp -v "$$file" $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/$$filename 2>&1 | \
+			scp $(SSH_OPTS) -v "$$file" $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/$$filename 2>&1 | \
 				grep -E "^(.*%|Transferring|Bytes)" || true; \
 		fi; \
 	done
