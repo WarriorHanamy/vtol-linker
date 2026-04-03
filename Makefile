@@ -12,9 +12,9 @@ CALIB_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-$(IMAGE_SUFFIX):latest
 LIO_IMAGE := $(IMAGE_PREFIX)/lio-$(IMAGE_SUFFIX):latest
 PX4_CONNECTOR_IMAGE := $(IMAGE_PREFIX)/px4-connector-$(IMAGE_SUFFIX):latest
 
-.PHONY: docker-build-lio docker-build-px4-connector docker-build-calib docker-run-calib
+.PHONY: docker-build-lio-jetson docker-build-px4-connector-jetson docker-build-calib-jetson docker-run-calib
 
-docker-build-lio:
+docker-build-lio-jetson:
 	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
@@ -23,7 +23,7 @@ docker-build-lio:
 		--load \
 		.
 
-docker-build-px4-connector:
+docker-build-px4-connector-jetson:
 	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
@@ -32,7 +32,7 @@ docker-build-px4-connector:
 		--load \
 		.
 
-docker-build-calib:
+docker-build-calib-jetson:
 	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
