@@ -29,9 +29,9 @@ RUN cd Micro-XRCE-DDS-Agent && \
 WORKDIR ${WS_DIR}/src
 
 # Todo, the multiple places dependencies on px4_msgs.
-COPY host/plotjuggler/px4_msgs ./px4_msgs
-COPY host/plotjuggler/px4_msgs_overlay/CMakeLists.txt ./px4_msgs/CMakeLists.txt
-COPY host/plotjuggler/px4_msgs_overlay/package.xml ./px4_msgs/package.xml
+COPY vtol_deployment/linker/px4_msgs ./px4_msgs
+COPY vtol_deployment/linker/px4_msgs_overlay/CMakeLists.txt ./px4_msgs/CMakeLists.txt
+COPY vtol_deployment/linker/px4_msgs_overlay/package.xml ./px4_msgs/package.xml
 COPY vtol_deployment/linker/px4_connector/src/px4_odometry_bridge ./px4_odometry_bridge
 
 WORKDIR ${WS_DIR}
