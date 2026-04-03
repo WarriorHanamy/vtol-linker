@@ -14,6 +14,8 @@ ENV WS_DIR=/root/ros2_ws
 ENV OPENSSL_ROOT_DIR=/usr
 ENV OPENSSL_CRYPTO_LIBRARY=/usr/lib/aarch64-linux-gnu/libcrypto.so
 ENV OPENSSL_SSL_LIBRARY=/usr/lib/aarch64-linux-gnu/libssl.so
+ENV FLANN_LIBRARY=/usr/lib/aarch64-linux-gnu/libflann_cpp.so
+ENV FLANN_INCLUDE_DIR=/usr/include
 ENV CMAKE_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu
 ENV CMAKE_INCLUDE_PATH=/usr/include:/usr/include/aarch64-linux-gnu
 
@@ -21,10 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
+    pkg-config \
     wget \
     python3-rosdep \
     libeigen3-dev \
     libflann-dev \
+    libflann1.9 \
     libssl-dev \
     libpcl-dev \
     ros-humble-pcl-ros \
@@ -63,7 +67,7 @@ RUN rm -rf ${WS_DIR}/build ${WS_DIR}/install ${WS_DIR}/log && \
     source /opt/ros/humble/setup.bash && \
     colcon build \
     --packages-select livox_ros_driver2 fast_lio \
-    --cmake-args -DHUMBLE_ROS=ON -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} -DOPENSSL_CRYPTO_LIBRARY=${OPENSSL_CRYPTO_LIBRARY} -DOPENSSL_SSL_LIBRARY=${OPENSSL_SSL_LIBRARY} -DCMAKE_LIBRARY_PATH=${CMAKE_LIBRARY_PATH} -DCMAKE_INCLUDE_PATH=${CMAKE_INCLUDE_PATH} \
+    --cmake-args -DHUMBLE_ROS=ON -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} -DOPENSSL_CRYPTO_LIBRARY=${OPENSSL_CRYPTO_LIBRARY} -DOPENSSL_SSL_LIBRARY=${OPENSSL_SSL_LIBRARY} -DFLANN_LIBRARY=${FLANN_LIBRARY} -DFLANN_INCLUDE_DIR=${FLANN_INCLUDE_DIR} -DCMAKE_LIBRARY_PATH=${CMAKE_LIBRARY_PATH} -DCMAKE_INCLUDE_PATH=${CMAKE_INCLUDE_PATH} \
     --parallel-workers 4
 
 COPY dockerfiles/ros_entrypoint.sh /ros_entrypoint.sh
