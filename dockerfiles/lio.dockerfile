@@ -90,12 +90,16 @@ RUN sed -i "s|http://ports.ubuntu.com/ubuntu-ports|${UBUNTU_PORTS_MIRROR}|g" /et
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    libflann1.9 libpcl1.12
+    libflann1.9
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    ros-humble-pcl-ros ros-humble-pcl-conversions \
+    ros-humble-pcl-ros ros-humble-pcl-conversions
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-tf2 ros-humble-tf2-ros ros-humble-tf2-sensor-msgs \
     ros-humble-tf2-geometry-msgs ros-humble-tf2-eigen
 
