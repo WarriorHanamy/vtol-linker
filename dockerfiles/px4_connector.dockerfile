@@ -24,6 +24,7 @@ RUN cd Micro-XRCE-DDS-Agent && \
     cmake .. && \
     make -j2 && \
     make install && \
+    ldconfig && \
     cd / && rm -rf /tmp/agent
 
 WORKDIR ${WS_DIR}/src

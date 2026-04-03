@@ -21,7 +21,9 @@ CALIB_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-$(IMAGE_SUFFIX):latest
 LIO_IMAGE := $(IMAGE_PREFIX)/lio-$(IMAGE_SUFFIX):latest
 PX4_CONNECTOR_IMAGE := $(IMAGE_PREFIX)/px4-connector-$(IMAGE_SUFFIX):latest
 
-.PHONY: docker-build-lio-jetson docker-build-px4-connector-jetson docker-build-calib-jetson docker-run-calib
+.PHONY: docker-build-lio-jetson docker-build-px4-connector-jetson docker-build-calib-jetson
+.PHONY: docker-run-calib docker-run-px4-connector-jetson docker-run-px4-connector-jetson-test
+.PHONY: detect-px4-serial
 .PHONY: check-network export-images transfer-images deploy-all deploy-skip-build
 
 # ==============================================================================
@@ -68,6 +70,33 @@ endif
 		$(if $(LAUNCH),--launch $(LAUNCH)) \
 		$(if $(PLAY_RATE),--rate $(PLAY_RATE)) \
 		/data/$(BAG)
+
+docker-run-px4-connector-jetson:
+	$(DOCKER) run --rm \
+		--net=host \
+		--privileged \
+		$(PX4_CONNECTOR_IMAGE)
+
+docker-run-px4-connector-jetson-test:
+	$(DOCKER) run --rm -it \
+		--net=host \
+		--privileged \
+		--entrypoint bash \
+		$(PX4_CONNECTOR_IMAGE)
+
+detect-px4-serial:
+	@echo "[INFO] Scanning for serial devices..."
+	@echo "[INFO] UART (ttyTHS):"
+	@ls -la /dev/ttyTHS* 2>/dev/null || echo "  (none)"
+	@echo "[INFO] USB (ttyACM):"
+	@ls -la /dev/ttyACM* 2>/dev/null || echo "  (none)"
+	@echo "[INFO] USB-Serial (ttyUSB):"
+	@ls -la /dev/ttyUSB* 2>/dev/null || echo "  (none)"
+	@echo ""
+	@echo "[INFO] To create fixed symlink, run on Jetson:"
+	@echo "  udevadm info -a -n /dev/ttyTHS1 | grep KERNELS"
+	@echo "  echo 'KERNELS==\"3100000.serial\", SYMLINK+=\"px4\"' | sudo tee /etc/udev/rules.d/99-px4.rules"
+	@echo "  sudo udevadm control --reload-rules && sudo udevadm trigger"
 
 # ==============================================================================
 # Deployment targets (fixed convention: host=192.168.55.100, device=192.168.55.1)
