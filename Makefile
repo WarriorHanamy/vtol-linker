@@ -58,10 +58,18 @@ docker-build-calib-jetson:
 		.
 
 
-.PHONY: docker-run-calib
-docker-run-calib:
+.PHONY: docker-run-lio-jetson
+docker-run-lio-jetson:
+	$(DOCKER) run --rm \
+		--net=host \
+		--ipc=host \
+		$(LIO_IMAGE)
+
+
+.PHONY: docker-run-calib-jetson
+docker-run-calib-jetson:
 ifndef BAG
-	$(error BAG is required. Usage: make docker-run-calib BAG=calibration.bag)
+	$(error BAG is required. Usage: make docker-run-calib-jetson BAG=calibration.bag)
 endif
 	@mkdir -p $(DATA_DIR)
 	$(DOCKER) run --rm \
@@ -84,8 +92,8 @@ docker-run-px4-connector-jetson:
 		$(PX4_CONNECTOR_IMAGE)
 
 
-.PHONY: docker-run-px4-connector-jetson-test
-docker-run-px4-connector-jetson-test:
+.PHONY: docker-run-px4-connector-jetson-shell
+docker-run-px4-connector-jetson-shell:
 	$(DOCKER) run --rm -it \
 		--net=host \
 		--ipc=host \
