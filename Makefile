@@ -66,6 +66,7 @@ endif
 	@mkdir -p $(DATA_DIR)
 	$(DOCKER) run --rm \
 		--net=host \
+		--ipc=host \
 		-v $(DATA_DIR):/data:rw \
 		$(CALIB_IMAGE) \
 		/usr/local/bin/calib_run.sh \
@@ -78,6 +79,7 @@ endif
 docker-run-px4-connector-jetson:
 	$(DOCKER) run --rm \
 		--net=host \
+		--ipc=host \
 		--privileged \
 		$(PX4_CONNECTOR_IMAGE)
 
@@ -86,6 +88,7 @@ docker-run-px4-connector-jetson:
 docker-run-px4-connector-jetson-test:
 	$(DOCKER) run --rm -it \
 		--net=host \
+		--ipc=host \
 		--privileged \
 		--entrypoint bash \
 		$(PX4_CONNECTOR_IMAGE)
