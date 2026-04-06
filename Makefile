@@ -21,15 +21,11 @@ CALIB_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-$(IMAGE_SUFFIX):latest
 LIO_IMAGE := $(IMAGE_PREFIX)/lio-$(IMAGE_SUFFIX):latest
 PX4_CONNECTOR_IMAGE := $(IMAGE_PREFIX)/px4-connector-$(IMAGE_SUFFIX):latest
 
-.PHONY: docker-build-lio-jetson docker-build-px4-connector-jetson docker-build-calib-jetson
-.PHONY: docker-run-calib docker-run-px4-connector-jetson docker-run-px4-connector-jetson-test
-.PHONY: detect-px4-serial
-.PHONY: check-network export-images transfer-images deploy-all deploy-skip-build
-
 # ==============================================================================
 # Build targets
 # ==============================================================================
 
+.PHONY: docker-build-lio-jetson
 docker-build-lio-jetson:
 	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
@@ -39,6 +35,8 @@ docker-build-lio-jetson:
 		--load \
 		.
 
+
+.PHONY: docker-build-px4-connector-jetson
 docker-build-px4-connector-jetson:
 	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
@@ -48,6 +46,8 @@ docker-build-px4-connector-jetson:
 		--load \
 		.
 
+
+.PHONY: docker-build-calib-jetson
 docker-build-calib-jetson:
 	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
@@ -57,6 +57,8 @@ docker-build-calib-jetson:
 		--load \
 		.
 
+
+.PHONY: docker-run-calib
 docker-run-calib:
 ifndef BAG
 	$(error BAG is required. Usage: make docker-run-calib BAG=calibration.bag)
@@ -71,12 +73,16 @@ endif
 		$(if $(PLAY_RATE),--rate $(PLAY_RATE)) \
 		/data/$(BAG)
 
+
+.PHONY: docker-run-px4-connector-jetson
 docker-run-px4-connector-jetson:
 	$(DOCKER) run --rm \
 		--net=host \
 		--privileged \
 		$(PX4_CONNECTOR_IMAGE)
 
+
+.PHONY: docker-run-px4-connector-jetson-test
 docker-run-px4-connector-jetson-test:
 	$(DOCKER) run --rm -it \
 		--net=host \
@@ -84,6 +90,8 @@ docker-run-px4-connector-jetson-test:
 		--entrypoint bash \
 		$(PX4_CONNECTOR_IMAGE)
 
+
+.PHONY: detect-px4-serial
 detect-px4-serial:
 	@echo "[INFO] Scanning for serial devices..."
 	@echo "[INFO] UART (ttyTHS):"
@@ -102,6 +110,8 @@ detect-px4-serial:
 # Deployment targets (fixed convention: host=192.168.55.100, device=192.168.55.1)
 # ==============================================================================
 
+
+.PHONY: check-network
 check-network:
 	@echo "[INFO] Checking network convention..."
 	@echo "[INFO] Host IP: $(HOST_IP)"
@@ -120,6 +130,8 @@ check-network:
 	@echo "[INFO] Device $(DEVICE_IP) reachable"
 	@echo "[INFO] Network convention check passed"
 
+
+.PHONY: export-images
 export-images: check-network
 	@echo "[INFO] Exporting Docker images..."
 	@mkdir -p $(IMAGE_DIR)
@@ -142,6 +154,8 @@ export-images: check-network
 		done
 	@echo "[INFO] Export completed: $(IMAGE_DIR)"
 
+
+.PHONY: transfer-images
 transfer-images: export-images
 	@echo "[INFO] Transferring images to $(DEVICE_USER)@$(DEVICE_IP)..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "mkdir -p $(REMOTE_DIR)"
@@ -155,16 +169,22 @@ transfer-images: export-images
 	done
 	@echo "[INFO] Transfer completed"
 
+
+.PHONY: load-images
 load-images:
 	@echo "[INFO] Loading images on device..."
 	@echo "[INFO] Run on device: cd $(REMOTE_DIR) && sha256sum -c checksums.sha256 && for f in *.tar; do docker load -i \$$f; done"
 
+
+.PHONY: deploy-all
 deploy-all: transfer-images
 	@echo "[INFO] Deployment completed"
 	@echo "[INFO] Images deployed to: $(DEVICE_IP):$(REMOTE_DIR)"
 	@echo "[INFO] Next step on device:"
 	@echo "[INFO]   cd $(REMOTE_DIR) && sha256sum -c checksums.sha256 && for f in *.tar; do docker load -i \$$f; done"
 
+
+.PHONY: deploy-skip-build
 deploy-skip-build: check-network
 	@echo "[INFO] Deploying without build..."
 	@if [ ! -d "$(IMAGE_DIR)" ] || [ -z "$$(ls $(IMAGE_DIR)/*.tar 2>/dev/null)" ]; then \
