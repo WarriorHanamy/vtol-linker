@@ -42,7 +42,7 @@ RUN rm -rf ${WS_DIR}/build ${WS_DIR}/install ${WS_DIR}/log && \
     source /opt/ros/humble/setup.bash && \
     colcon build \
     --packages-select px4_msgs px4_odometry_bridge \
-    --parallel-workers 4
+    --parallel-workers 1
 
 COPY dockerfiles/px4_connector_entrypoint.sh /px4_connector_entrypoint.sh
 RUN chmod +x /px4_connector_entrypoint.sh
