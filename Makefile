@@ -52,7 +52,7 @@ docker-build-calib-jetson:
 	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
-		-f calibration/dockerfiles/calib_lidar_imu_init.dockerfile \
+		-f dockerfiles/calib_lidar_imu_init.dockerfile \
 		-t $(CALIB_IMAGE) \
 		--load \
 		.
