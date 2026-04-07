@@ -19,6 +19,7 @@ SSH_OPTS := $(if $(wildcard $(SSH_KEY)),-i $(SSH_KEY),)
 
 CALIB_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-$(IMAGE_SUFFIX):latest
 LIO_IMAGE := $(IMAGE_PREFIX)/lio-$(IMAGE_SUFFIX):latest
+LIO_UPSTREAM_LIVOX_IMAGE := $(IMAGE_PREFIX)/lio-upstream-livox-$(IMAGE_SUFFIX):latest
 PX4_CONNECTOR_IMAGE := $(IMAGE_PREFIX)/px4-connector-$(IMAGE_SUFFIX):latest
 
 # ==============================================================================
@@ -32,6 +33,17 @@ docker-build-lio-jetson:
 		--platform $(PLATFORM) \
 		-f dockerfiles/lio.dockerfile \
 		-t $(LIO_IMAGE) \
+		--load \
+		.
+
+
+.PHONY: docker-build-lio-upstream-livox-jetson
+docker-build-lio-upstream-livox-jetson:
+	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
+	$(DOCKER) buildx build \
+		--platform $(PLATFORM) \
+		-f dockerfiles/lio_upstream_livox.dockerfile \
+		-t $(LIO_UPSTREAM_LIVOX_IMAGE) \
 		--load \
 		.
 
@@ -64,6 +76,14 @@ docker-run-lio-jetson:
 		--net=host \
 		--ipc=host \
 		$(LIO_IMAGE)
+
+
+.PHONY: docker-run-lio-upstream-livox-jetson
+docker-run-lio-upstream-livox-jetson:
+	$(DOCKER) run --rm \
+		--net=host \
+		--ipc=host \
+		$(LIO_UPSTREAM_LIVOX_IMAGE)
 
 
 .PHONY: docker-run-calib-jetson
@@ -146,7 +166,7 @@ check-network:
 export-images: check-network
 	@echo "[INFO] Exporting Docker images..."
 	@mkdir -p $(IMAGE_DIR)
-	@for image in $(LIO_IMAGE) $(PX4_CONNECTOR_IMAGE) $(CALIB_IMAGE); do \
+	@for image in $(LIO_IMAGE) $(LIO_UPSTREAM_LIVOX_IMAGE) $(PX4_CONNECTOR_IMAGE) $(CALIB_IMAGE); do \
 		filename=$$(echo "$$image" | tr '/:' '--').tar; \
 		echo "[INFO] Exporting: $$image -> $$filename"; \
 		$(DOCKER) save -o $(IMAGE_DIR)/$$filename $$image || exit 1; \

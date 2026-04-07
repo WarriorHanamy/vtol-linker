@@ -1,8 +1,53 @@
+# =============================================================
+# PX4 Connector (Micro-XRCE-DDS-Agent + px4_odometry_bridge)
+#
+# Base image: ros:humble-ros-core-jammy
+#   - Ubuntu 22.04 (Jammy), ROS2 Humble (minimal, no GUI tools)
+#   - Multi-arch: amd64, arm64
+#   - Compatible with Jetson JetPack 5 (L4T R35.x, Ubuntu 20.04 host)
+#     and JetPack 6 (L4T R36.x, Ubuntu 22.04 host)
+#   - CUDA not required; runs as a standalone bridge node
+#
+# Workspaces:
+#   /root/px4_connector_ws — px4_msgs + px4_odometry_bridge (built in container)
+#
+# Components:
+#   - Micro-XRCE-DDS-Agent (C++): UDP bridge to PX4 uXRCE-DDS middleware
+#   - px4_odometry_bridge (ROS2 node): converts PX4 odometry to standard nav_msgs
+#   - px4_msgs (overlay): minimal message definitions for PX4-ROS2 communication
+# =============================================================
+
+# =============================================================
+# PX4 Connector (Micro-XRCE-DDS-Agent + px4_odometry_bridge)
+#
+# Base image: ros:humble-ros-core-jammy
+#   - Ubuntu 22.04 (Jammy), ROS2 Humble (minimal, no GUI tools)
+#   - Multi-arch: amd64, arm64
+#   - Compatible with Jetson JetPack 5 (L4T R35.x, Ubuntu 20.04 host)
+#     and JetPack 6 (L4T R36.x, Ubuntu 22.04 host)
+#   - CUDA not required; runs as a standalone bridge node
+#
+# Workspaces:
+#   /root/px4_connector_ws — px4_msgs + px4_odometry_bridge (built in container)
+#
+# Components:
+#   - Micro-XRCE-DDS-Agent (C++): UDP bridge to PX4 uXRCE-DDS middleware
+#   - px4_odometry_bridge (ROS2 node): converts PX4 odometry to standard nav_msgs
+#   - px4_msgs (overlay): minimal message definitions for PX4-ROS2 communication
+# =============================================================
+
 FROM ros:humble-ros-core-jammy
+
+ARG UBUNTU_PORTS_MIRROR=http://mirrors.ustc.edu.cn/ubuntu-ports
+ARG ROS_MIRROR=https://mirrors.ustc.edu.cn/ros2/ubuntu
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=humble
 ENV WS_DIR=/root/px4_connector_ws
+
+RUN sed -i "s|http://ports.ubuntu.com/ubuntu-ports|${UBUNTU_PORTS_MIRROR}|g" /etc/apt/sources.list && \
+    sed -i "s|http://packages.ros.org/ros2/ubuntu|${ROS_MIRROR}|g" /etc/apt/sources.list.d/ros2.sources && \
+    sed -i "s|Types: deb deb-src|Types: deb|g" /etc/apt/sources.list.d/ros2.sources
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \

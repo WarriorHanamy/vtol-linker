@@ -1,5 +1,53 @@
+# =============================================================
+# LiDAR-IMU Calibration (LiDAR_IMU_Init + Ceres + Livox Driver)
+#
+# Base image: ros:noetic-ros-base (configurable via BASE_IMAGE)
+#   - Ubuntu 20.04 (Focal), ROS1 Noetic
+#   - Multi-arch: amd64, arm64 (arm64 support exists but is community-maintained)
+#   - JetPack 5 (L4T R35.x): native Ubuntu 20.04 — fully compatible
+#   - JetPack 6 (L4T R36.x): Ubuntu 22.04 host — requires this container
+#   - Note: ROS Noetic reaches EOL May 2025; consider migration to ROS2
+#
+# Workspaces:
+#   /root/catkin_ws — LiDAR_IMU_Init + livox_ros_driver (built in container)
+#
+# Stages:
+#   1. ceres-builder — Ceres Solver 2.0.0 (minimal, no SuiteSparse/LAPACK)
+#   2. pcl-builder   — PCL + ROS Noetic deps
+#   3. final         — full calibration runtime
+#
+# Build args:
+#   BASE_IMAGE        — ROS base image (default: ros:noetic-ros-base)
+#   CERES_VERSION     — Ceres Solver version (default: 2.0.0)
+#   LIVOX_DRIVER_VERSION — livox_ros_driver version (default: 2.6.0)
+# =============================================================
+
+# =============================================================
+# LiDAR-IMU Calibration (LiDAR_IMU_Init + Ceres + Livox Driver)
+#
+# Base image: ros:noetic-ros-base (configurable via BASE_IMAGE)
+#   - Ubuntu 20.04 (Focal), ROS1 Noetic
+#   - Multi-arch: amd64, arm64 (arm64 support exists but is community-maintained)
+#   - JetPack 5 (L4T R35.x): native Ubuntu 20.04 — fully compatible
+#   - JetPack 6 (L4T R36.x): Ubuntu 22.04 host — requires this container
+#   - Note: ROS Noetic reaches EOL May 2025; consider migration to ROS2
+#
+# Workspaces:
+#   /root/catkin_ws — LiDAR_IMU_Init + livox_ros_driver (built in container)
+#
+# Stages:
+#   1. ceres-builder — Ceres Solver 2.0.0 (minimal, no SuiteSparse/LAPACK)
+#   2. pcl-builder   — PCL + ROS Noetic deps
+#   3. final         — full calibration runtime
+#
+# Build args:
+#   BASE_IMAGE        — ROS base image (default: ros:noetic-ros-base)
+#   CERES_VERSION     — Ceres Solver version (default: 2.0.0)
+#   LIVOX_DRIVER_VERSION — livox_ros_driver version (default: 2.6.0)
+# =============================================================
+
 ARG BASE_IMAGE=ros:noetic-ros-base
-ARG UBUNTU_PORTS_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports
+ARG UBUNTU_PORTS_MIRROR=http://mirrors.ustc.edu.cn/ubuntu-ports
 ARG CERES_VERSION=2.0.0
 ARG LIVOX_DRIVER_VERSION=2.6.0
 ARG CERES_CXX_FLAGS=-O0 -g0 -fno-inline

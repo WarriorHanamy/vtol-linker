@@ -1,5 +1,5 @@
 # =============================================================
-# LIO (FastLIO + Livox ROS Driver2) — Multi-stage Dockerfile
+# LIO (FastLIO + Upstream Livox ROS Driver2) — Multi-stage Dockerfile
 #
 # Base image: ros:humble-ros-base
 #   - Ubuntu 22.04 (Jammy), ROS2 Humble
@@ -9,16 +9,20 @@
 #   - CUDA not required in this image; CUDA/ROS bridge is separate
 #
 # Workspaces:
-#   /root/ros2_ws — livox_ros_driver2 + fast_lio (built in container)
+#   /root/ros2_ws — upstream livox_ros_driver2 (from GitHub) + local fast_lio
 #
 # Stages:
 #   1. sdk-builder  — Livox-SDK2 (isolated compile)
-#   2. ros-builder  — colcon build of livox_ros_driver2 + fast_lio
+#   2. ros-builder  — colcon build of upstream livox_ros_driver2 + fast_lio
 #   3. runtime      — minimal image with pre-built packages
+#
+# Build args:
+#   LIVOX_ROS_DRIVER2_REPO — git URL for livox_ros_driver2 (default: upstream)
+#   LIVOX_ROS_DRIVER2_REF  — git branch/tag (default: master)
 # =============================================================
 
 # =============================================================
-# LIO (FastLIO + Livox ROS Driver2) — Multi-stage Dockerfile
+# LIO (FastLIO + Upstream Livox ROS Driver2) — Multi-stage Dockerfile
 #
 # Base image: ros:humble-ros-base
 #   - Ubuntu 22.04 (Jammy), ROS2 Humble
@@ -28,16 +32,20 @@
 #   - CUDA not required in this image; CUDA/ROS bridge is separate
 #
 # Workspaces:
-#   /root/ros2_ws — livox_ros_driver2 + fast_lio (built in container)
+#   /root/ros2_ws — upstream livox_ros_driver2 (from GitHub) + local fast_lio
 #
 # Stages:
 #   1. sdk-builder  — Livox-SDK2 (isolated compile)
-#   2. ros-builder  — colcon build of livox_ros_driver2 + fast_lio
+#   2. ros-builder  — colcon build of upstream livox_ros_driver2 + fast_lio
 #   3. runtime      — minimal image with pre-built packages
+#
+# Build args:
+#   LIVOX_ROS_DRIVER2_REPO — git URL for livox_ros_driver2 (default: upstream)
+#   LIVOX_ROS_DRIVER2_REF  — git branch/tag (default: master)
 # =============================================================
 
 # ============================================================
-# stage 1: Livox-SDK2 (独立编译，隔离 QEMU 压力)
+# stage 1: Livox-SDK2 (independent build)
 # ============================================================
 FROM ros:humble-ros-base AS sdk-builder
 
@@ -62,12 +70,14 @@ RUN cd /tmp/Livox-SDK2 && \
     ldconfig && rm -rf /tmp/Livox-SDK2
 
 # ============================================================
-# stage 2: colcon build (livox_ros_driver2 + fast_lio)
+# stage 2: colcon build (upstream livox_ros_driver2 + local fast_lio)
 # ============================================================
 FROM ros:humble-ros-base AS ros-builder
 
 ARG UBUNTU_PORTS_MIRROR=http://mirrors.ustc.edu.cn/ubuntu-ports
 ARG ROS_MIRROR=https://mirrors.ustc.edu.cn/ros2/ubuntu
+ARG LIVOX_ROS_DRIVER2_REPO=https://github.com/Livox-SDK/livox_ros_driver2.git
+ARG LIVOX_ROS_DRIVER2_REF=master
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV WS_DIR=/root/ros2_ws
@@ -79,7 +89,7 @@ RUN sed -i "s|http://ports.ubuntu.com/ubuntu-ports|${UBUNTU_PORTS_MIRROR}|g" /et
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    python3-rosdep python3-pip libeigen3-dev libpcl-dev
+    python3-rosdep python3-pip libeigen3-dev libpcl-dev libssl-dev git
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -96,13 +106,16 @@ COPY --from=sdk-builder /usr/local/lib /usr/local/lib
 COPY --from=sdk-builder /usr/local/include /usr/local/include
 
 WORKDIR ${WS_DIR}/src
-COPY lidar_connector/livox_ros_driver2 ./livox_ros_driver2
-COPY lidar_connector/FAST_LIO_ROS2 ./FAST_LIO_ROS2
-
-RUN python3 - <<'PY'
+RUN git clone --depth 1 --branch ${LIVOX_ROS_DRIVER2_REF} ${LIVOX_ROS_DRIVER2_REPO} livox_ros_driver2 && \
+    cd livox_ros_driver2 && \
+    if [ -f package_ROS2.xml ]; then mv package_ROS2.xml package.xml; fi && \
+    if grep -q 'LIVOX_INTERFACES_INCLUDE_DIRECTORIES' CMakeLists.txt; then \
+      sed -i '/LIVOX_INTERFACES_INCLUDE_DIRECTORIES/d' CMakeLists.txt; \
+    fi && \
+    python3 - <<'PY'
 from pathlib import Path
 
-path = Path('livox_ros_driver2/CMakeLists.txt')
+path = Path('CMakeLists.txt')
 text = path.read_text()
 
 # Locate ROS2 branch; upstream uses else(ROS_EDITION ...), local uses else()
@@ -140,6 +153,8 @@ if 'Eigen3::Eigen' not in ros2:
 path.write_text(before + ros2)
 PY
 
+COPY lidar_connector/FAST_LIO_ROS2 ./FAST_LIO_ROS2
+
 WORKDIR ${WS_DIR}
 SHELL ["/bin/bash", "-c"]
 
@@ -155,7 +170,7 @@ RUN arch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)" && \
     --parallel-workers 1
 
 # ============================================================
-# stage 3: runtime (最小运行时镜像)
+# stage 3: runtime
 # ============================================================
 FROM ros:humble-ros-base
 
