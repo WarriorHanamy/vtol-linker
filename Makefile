@@ -182,17 +182,16 @@ transfer-images: export-images
 
 
 .PHONY: load-images
-load-images:
+load-images: transfer-images
 	@echo "[INFO] Loading images on device..."
-	@echo "[INFO] Run on device: cd $(REMOTE_DIR) && sha256sum -c checksums.sha256 && for f in *.tar; do docker load -i \$$f; done"
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(REMOTE_DIR) && sha256sum -c checksums.sha256 && for f in *.tar; do docker load -i \$$f; done"
 
 
 .PHONY: deploy-all
-deploy-all: transfer-images
+deploy-all: load-images
 	@echo "[INFO] Deployment completed"
 	@echo "[INFO] Images deployed to: $(DEVICE_IP):$(REMOTE_DIR)"
-	@echo "[INFO] Next step on device:"
-	@echo "[INFO]   cd $(REMOTE_DIR) && sha256sum -c checksums.sha256 && for f in *.tar; do docker load -i \$$f; done"
+	@echo "[INFO] All images loaded on device"
 
 
 .PHONY: deploy-skip-build
@@ -203,8 +202,7 @@ deploy-skip-build: check-network
 		echo "[ERROR] Run 'make export-images' first"; \
 		exit 1; \
 	fi
-	@$(MAKE) --no-print-directory transfer-images
+	@$(MAKE) --no-print-directory load-images
 	@echo "[INFO] Deployment completed (build skipped)"
 	@echo "[INFO] Images deployed to: $(DEVICE_IP):$(REMOTE_DIR)"
-	@echo "[INFO] Next step on device:"
-	@echo "[INFO]   cd $(REMOTE_DIR) && sha256sum -c checksums.sha256 && for f in *.tar; do docker load -i \$$f; done"
+	@echo "[INFO] All images loaded on device"
