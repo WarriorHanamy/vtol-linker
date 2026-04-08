@@ -19,55 +19,84 @@ SSH_OPTS := $(if $(wildcard $(SSH_KEY)),-i $(SSH_KEY),)
 
 CALIB_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-$(IMAGE_SUFFIX):latest
 LIO_IMAGE := $(IMAGE_PREFIX)/lio-$(IMAGE_SUFFIX):latest
-LIO_UPSTREAM_LIVOX_IMAGE := $(IMAGE_PREFIX)/lio-upstream-livox-$(IMAGE_SUFFIX):latest
 PX4_CONNECTOR_IMAGE := $(IMAGE_PREFIX)/px4-connector-$(IMAGE_SUFFIX):latest
+
+CALIB_PREP_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-prep-$(IMAGE_SUFFIX):latest
+LIO_PREP_IMAGE := $(IMAGE_PREFIX)/lio-prep-$(IMAGE_SUFFIX):latest
+PX4_CONNECTOR_PREP_IMAGE := $(IMAGE_PREFIX)/px4-connector-prep-$(IMAGE_SUFFIX):latest
+
+CALIB_PREP_ARCHIVE := $(IMAGE_DIR)/calib-lidar-imu-init-prep-$(IMAGE_SUFFIX).tar
+LIO_PREP_ARCHIVE := $(IMAGE_DIR)/lio-prep-$(IMAGE_SUFFIX).tar
+PX4_CONNECTOR_PREP_ARCHIVE := $(IMAGE_DIR)/px4-connector-prep-$(IMAGE_SUFFIX).tar
+
+CALIB_REMOTE_BUILD_DIR := $(REMOTE_DIR)/calib-native
+LIO_REMOTE_BUILD_DIR := $(REMOTE_DIR)/lio-native
+PX4_CONNECTOR_REMOTE_BUILD_DIR := $(REMOTE_DIR)/px4-connector-native
 
 # ==============================================================================
 # Build targets
 # ==============================================================================
 
 .PHONY: docker-build-lio-jetson
-docker-build-lio-jetson:
-	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
+docker-build-lio-jetson: check-network
+	@echo "[1/4] Building prep image locally for $(PLATFORM)..."
+	@mkdir -p $(IMAGE_DIR)
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
-		-f dockerfiles/lio.dockerfile \
-		-t $(LIO_IMAGE) \
-		--load \
+		-f dockerfiles/lio.perp.Dockerfile \
+		--target prep \
+		-t $(LIO_PREP_IMAGE) \
+		--output type=docker,dest=$(LIO_PREP_ARCHIVE) \
 		.
-
-
-.PHONY: docker-build-lio-upstream-livox-jetson
-docker-build-lio-upstream-livox-jetson:
-	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
-	$(DOCKER) buildx build \
-		--platform $(PLATFORM) \
-		-f dockerfiles/lio_upstream_livox.dockerfile \
-		-t $(LIO_UPSTREAM_LIVOX_IMAGE) \
-		--load \
-		.
-
+	@echo "[2/4] Shipping prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(LIO_REMOTE_BUILD_DIR) && mkdir -p $(LIO_REMOTE_BUILD_DIR)/dockerfiles"
+	@scp $(SSH_OPTS) $(LIO_PREP_ARCHIVE) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
+	@scp $(SSH_OPTS) dockerfiles/lio.native.Dockerfile dockerfiles/ros_entrypoint.sh $(DEVICE_USER)@$(DEVICE_IP):$(LIO_REMOTE_BUILD_DIR)/dockerfiles/
+	@echo "[3/4] Loading prep image on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(LIO_PREP_ARCHIVE))"
+	@echo "[4/4] Building final LIO image natively on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build -f $(LIO_REMOTE_BUILD_DIR)/dockerfiles/lio.native.Dockerfile --build-arg PREP_IMAGE=$(LIO_PREP_IMAGE) -t $(LIO_IMAGE) $(LIO_REMOTE_BUILD_DIR)"
 
 .PHONY: docker-build-px4-connector-jetson
-docker-build-px4-connector-jetson:
-	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
+docker-build-px4-connector-jetson: check-network
+	@echo "[1/4] Building PX4 prep image locally for $(PLATFORM)..."
+	@mkdir -p $(IMAGE_DIR)
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
-		-f dockerfiles/px4_connector.dockerfile \
-		-t $(PX4_CONNECTOR_IMAGE) \
-		--load \
+		-f dockerfiles/px4_connector.perp.Dockerfile \
+		--target prep \
+		-t $(PX4_CONNECTOR_PREP_IMAGE) \
+		--output type=docker,dest=$(PX4_CONNECTOR_PREP_ARCHIVE) \
 		.
+	@echo "[2/4] Shipping PX4 prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(PX4_CONNECTOR_REMOTE_BUILD_DIR) && mkdir -p $(PX4_CONNECTOR_REMOTE_BUILD_DIR)/dockerfiles"
+	@scp $(SSH_OPTS) $(PX4_CONNECTOR_PREP_ARCHIVE) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
+	@scp $(SSH_OPTS) dockerfiles/px4_connector.native.Dockerfile dockerfiles/px4_connector_entrypoint.sh $(DEVICE_USER)@$(DEVICE_IP):$(PX4_CONNECTOR_REMOTE_BUILD_DIR)/dockerfiles/
+	@echo "[3/4] Loading PX4 prep image on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(PX4_CONNECTOR_PREP_ARCHIVE))"
+	@echo "[4/4] Building final PX4 image natively on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build -f $(PX4_CONNECTOR_REMOTE_BUILD_DIR)/dockerfiles/px4_connector.native.Dockerfile --build-arg PREP_IMAGE=$(PX4_CONNECTOR_PREP_IMAGE) -t $(PX4_CONNECTOR_IMAGE) $(PX4_CONNECTOR_REMOTE_BUILD_DIR)"
 
 
 .PHONY: docker-build-calib-jetson
-docker-build-calib-jetson:
-	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
+docker-build-calib-jetson: check-network
+	@echo "[1/4] Building calibration prep image locally for $(PLATFORM)..."
+	@mkdir -p $(IMAGE_DIR)
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
-		-f dockerfiles/calib_lidar_imu_init.dockerfile \
-		-t $(CALIB_IMAGE) \
-		--load \
+		-f dockerfiles/calib_lidar_imu_init.perp.Dockerfile \
+		--target prep \
+		-t $(CALIB_PREP_IMAGE) \
+		--output type=docker,dest=$(CALIB_PREP_ARCHIVE) \
 		.
+	@echo "[2/4] Shipping calibration prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(CALIB_REMOTE_BUILD_DIR) && mkdir -p $(CALIB_REMOTE_BUILD_DIR)/dockerfiles"
+	@scp $(SSH_OPTS) $(CALIB_PREP_ARCHIVE) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
+	@scp $(SSH_OPTS) dockerfiles/calib_lidar_imu_init.native.Dockerfile dockerfiles/calib_entrypoint.sh dockerfiles/calib_run.sh $(DEVICE_USER)@$(DEVICE_IP):$(CALIB_REMOTE_BUILD_DIR)/dockerfiles/
+	@echo "[3/4] Loading calibration prep image on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(CALIB_PREP_ARCHIVE))"
+	@echo "[4/4] Building final calibration image natively on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build -f $(CALIB_REMOTE_BUILD_DIR)/dockerfiles/calib_lidar_imu_init.native.Dockerfile --build-arg PREP_IMAGE=$(CALIB_PREP_IMAGE) -t $(CALIB_IMAGE) $(CALIB_REMOTE_BUILD_DIR)"
 
 
 .PHONY: docker-run-lio-jetson
@@ -76,15 +105,6 @@ docker-run-lio-jetson:
 		--net=host \
 		--ipc=host \
 		$(LIO_IMAGE)
-
-
-.PHONY: docker-run-lio-upstream-livox-jetson
-docker-run-lio-upstream-livox-jetson:
-	$(DOCKER) run --rm \
-		--net=host \
-		--ipc=host \
-		$(LIO_UPSTREAM_LIVOX_IMAGE)
-
 
 .PHONY: docker-run-calib-jetson
 docker-run-calib-jetson:
@@ -161,68 +181,3 @@ check-network:
 	@echo "[INFO] Device $(DEVICE_IP) reachable"
 	@echo "[INFO] Network convention check passed"
 
-
-.PHONY: export-images
-export-images: check-network
-	@echo "[INFO] Exporting Docker images..."
-	@mkdir -p $(IMAGE_DIR)
-	@for image in $(LIO_IMAGE) $(LIO_UPSTREAM_LIVOX_IMAGE) $(PX4_CONNECTOR_IMAGE) $(CALIB_IMAGE); do \
-		filename=$$(echo "$$image" | tr '/:' '--').tar; \
-		echo "[INFO] Exporting: $$image -> $$filename"; \
-		$(DOCKER) save -o $(IMAGE_DIR)/$$filename $$image || exit 1; \
-	done
-	@echo "[INFO] Generating checksums..."
-	@cd $(IMAGE_DIR) && sha256sum *.tar > checksums.sha256
-	@echo "[INFO] Generating manifest..."
-	@cd $(IMAGE_DIR) && \
-		echo "# VTOL Docker Image Manifest" > manifest.txt && \
-		echo "# Generated: $$(date -Iseconds)" >> manifest.txt && \
-		echo "# Host: $$(hostname)" >> manifest.txt && \
-		echo "" >> manifest.txt && \
-		for image in $(LIO_IMAGE) $(PX4_CONNECTOR_IMAGE) $(CALIB_IMAGE); do \
-			filename=$$(echo "$$image" | tr '/:' '--').tar; \
-			echo "$$filename $$image" >> manifest.txt; \
-		done
-	@echo "[INFO] Export completed: $(IMAGE_DIR)"
-
-
-.PHONY: transfer-images
-transfer-images: export-images
-	@echo "[INFO] Transferring images to $(DEVICE_USER)@$(DEVICE_IP)..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "mkdir -p $(REMOTE_DIR)"
-	@for file in $(IMAGE_DIR)/*.tar $(IMAGE_DIR)/checksums.sha256 $(IMAGE_DIR)/manifest.txt; do \
-		if [ -f "$$file" ]; then \
-			filename=$$(basename "$$file"); \
-			echo "[INFO] Transferring: $$filename"; \
-			scp $(SSH_OPTS) -v "$$file" $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/$$filename 2>&1 | \
-				grep -E "^(.*%|Transferring|Bytes)" || true; \
-		fi; \
-	done
-	@echo "[INFO] Transfer completed"
-
-
-.PHONY: load-images
-load-images: transfer-images
-	@echo "[INFO] Loading images on device..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(REMOTE_DIR) && sha256sum -c checksums.sha256 && for f in *.tar; do docker load -i \$$f; done"
-
-
-.PHONY: deploy-all
-deploy-all: load-images
-	@echo "[INFO] Deployment completed"
-	@echo "[INFO] Images deployed to: $(DEVICE_IP):$(REMOTE_DIR)"
-	@echo "[INFO] All images loaded on device"
-
-
-.PHONY: deploy-skip-build
-deploy-skip-build: check-network
-	@echo "[INFO] Deploying without build..."
-	@if [ ! -d "$(IMAGE_DIR)" ] || [ -z "$$(ls $(IMAGE_DIR)/*.tar 2>/dev/null)" ]; then \
-		echo "[ERROR] No exported images found in $(IMAGE_DIR)"; \
-		echo "[ERROR] Run 'make export-images' first"; \
-		exit 1; \
-	fi
-	@$(MAKE) --no-print-directory load-images
-	@echo "[INFO] Deployment completed (build skipped)"
-	@echo "[INFO] Images deployed to: $(DEVICE_IP):$(REMOTE_DIR)"
-	@echo "[INFO] All images loaded on device"
