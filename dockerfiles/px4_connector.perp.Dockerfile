@@ -39,6 +39,7 @@ COPY px4_connector/px4_msgs ./px4_msgs
 COPY px4_connector/px4_msgs_overlay/CMakeLists.txt ./px4_msgs/CMakeLists.txt
 COPY px4_connector/px4_msgs_overlay/package.xml ./px4_msgs/package.xml
 COPY px4_connector/src/px4_odometry_bridge ./px4_odometry_bridge
+COPY px4_connector/src/imu_bridge ./imu_bridge
 
 WORKDIR ${WS_DIR}
 SHELL ["/bin/bash", "-c"]

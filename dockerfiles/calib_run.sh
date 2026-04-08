@@ -14,10 +14,12 @@ readonly WS_DIR="/root/catkin_ws"
 readonly RESULT_SRC="${WS_DIR}/src/LiDAR_IMU_Init/result/Initialization_result.txt"
 readonly RESULT_DST="${DATA_DIR}/Initialization_result.txt"
 readonly DEFAULT_LAUNCH="mid360.launch"
+readonly IMU_BRIDGE_LAUNCH="calib_with_imu.launch"
 
 BAG_FILE=""
 LAUNCH="${DEFAULT_LAUNCH}"
 PLAY_RATE=""
+USE_IMU_BRIDGE=false
 
 fct_usage() {
 	cat <<EOF
@@ -27,6 +29,7 @@ Options:
   -h, --help          Show this help and exit
   -l, --launch NAME   ROS launch file (default: ${DEFAULT_LAUNCH})
   -r, --rate RATE     rosbag play rate (default: 1.0)
+  -i, --imu-bridge    Use IMU bridge (PX4 -> ROS1)
 
 Arguments:
   bag_file            Path to rosbag file inside ${DATA_DIR}/
@@ -34,6 +37,7 @@ Arguments:
 Examples:
   ${SCRIPT_NAME} calibration_data.bag
   ${SCRIPT_NAME} --rate 0.5 --launch livox_avia.launch calibration.bag
+  ${SCRIPT_NAME} --imu-bridge calibration_data.bag
 EOF
 }
 
@@ -51,6 +55,10 @@ fct_parse_arguments() {
 		-r | --rate)
 			PLAY_RATE="${2}"
 			shift 2
+			;;
+		-i | --imu-bridge)
+			USE_IMU_BRIDGE=true
+			shift
 			;;
 		--)
 			shift
@@ -117,6 +125,7 @@ fct_run_calibration() {
 	echo "========================================"
 	echo " Bag:   ${BAG_FILE}"
 	echo " Launch: ${LAUNCH}"
+	echo " IMU Bridge: ${USE_IMU_BRIDGE}"
 	if [[ -n "${PLAY_RATE}" ]]; then
 		echo " Rate:  ${PLAY_RATE}x"
 	fi
@@ -131,7 +140,17 @@ fct_run_calibration() {
 		exit 1
 	fi
 
-	roslaunch lidar_imu_init "${LAUNCH}" rviz:=false &
+	# Copy launch file to workspace if using IMU bridge
+	if [[ "${USE_IMU_BRIDGE}" == "true" ]]; then
+		local launch_file="${WS_DIR}/src/LiDAR_IMU_Init/launch/${IMU_BRIDGE_LAUNCH}"
+		if [[ ! -f "${launch_file}" ]]; then
+			echo "[INFO] Installing IMU bridge launch file ..."
+			cp "/dockerfiles/calib_with_imu.launch" "${launch_file}" 2>/dev/null || true
+		fi
+		roslaunch lidar_imu_init "${IMU_BRIDGE_LAUNCH}" rviz:=false &
+	else
+		roslaunch lidar_imu_init "${LAUNCH}" rviz:=false &
+	fi
 	local node_pid=$!
 	sleep 5
 
@@ -196,6 +215,7 @@ fct_cleanup() {
 	pkill -f "roscore" 2>/dev/null || true
 	pkill -f "li_init" 2>/dev/null || true
 	pkill -f "rosmaster" 2>/dev/null || true
+	pkill -f "imu_receiver_node" 2>/dev/null || true
 }
 
 main() {

@@ -7,6 +7,7 @@ DATA_DIR ?= $(CURDIR)/data
 BAG ?=
 LAUNCH ?= mid360.launch
 PLAY_RATE ?=
+IMU_BRIDGE ?= false
 
 # Deployment configuration (fixed convention)
 HOST_IP := 192.168.55.100
@@ -120,6 +121,7 @@ endif
 		/usr/local/bin/calib_run.sh \
 		$(if $(LAUNCH),--launch $(LAUNCH)) \
 		$(if $(PLAY_RATE),--rate $(PLAY_RATE)) \
+		$(if $(filter true,$(IMU_BRIDGE)),--imu-bridge,) \
 		/data/$(BAG)
 
 

@@ -52,5 +52,7 @@ RUN chmod +x /calib_entrypoint.sh
 COPY dockerfiles/calib_run.sh /usr/local/bin/calib_run.sh
 RUN chmod +x /usr/local/bin/calib_run.sh
 
+COPY dockerfiles/calib_with_imu.launch /dockerfiles/calib_with_imu.launch
+
 ENTRYPOINT ["/calib_entrypoint.sh"]
 CMD ["bash"]

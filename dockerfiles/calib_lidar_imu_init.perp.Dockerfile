@@ -62,6 +62,7 @@ RUN wget -q "https://github.com/ceres-solver/ceres-solver/archive/refs/tags/${CE
 
 WORKDIR ${WS_DIR}/src
 COPY LiDAR_IMU_Init ./LiDAR_IMU_Init
+COPY imu_bridge_ros1 ./imu_bridge_ros1
 
 RUN cd /opt/calib-src && \
     wget -q "https://github.com/Livox-SDK/livox_ros_driver/archive/refs/tags/v${LIVOX_DRIVER_VERSION}.tar.gz" && \

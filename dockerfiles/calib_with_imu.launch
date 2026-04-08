@@ -1,0 +1,12 @@
+<launch>
+    <!-- Start IMU receiver node first -->
+    <node pkg="imu_bridge_ros1" type="imu_receiver_node" name="imu_receiver_node" output="screen">
+        <param name="socket_path" value="/tmp/imu_bridge.sock" />
+        <param name="publish_topic" value="/mavros/imu/data_raw" />
+    </node>
+
+    <!-- Start LiDAR IMU Init -->
+    <include file="$(find lidar_imu_init)/launch/livox_mid360.launch">
+        <arg name="rviz" value="false" />
+    </include>
+</launch>

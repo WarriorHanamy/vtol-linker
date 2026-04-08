@@ -1,0 +1,6 @@
+<launch>
+    <node pkg="imu_bridge_ros1" type="imu_receiver_node" name="imu_receiver_node" output="screen">
+        <param name="socket_path" value="/tmp/imu_bridge.sock" />
+        <param name="publish_topic" value="/mavros/imu/data_raw" />
+    </node>
+</launch>

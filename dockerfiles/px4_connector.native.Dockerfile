@@ -22,7 +22,7 @@ SHELL ["/bin/bash", "-c"]
 RUN rm -rf ${WS_DIR}/build ${WS_DIR}/install ${WS_DIR}/log && \
     source /opt/ros/humble/setup.bash && \
     colcon build \
-    --packages-select px4_msgs px4_odometry_bridge \
+    --packages-select px4_msgs px4_odometry_bridge imu_bridge \
     --parallel-workers 4
 
 FROM ros:humble-ros-core-jammy
