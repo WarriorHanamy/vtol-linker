@@ -46,6 +46,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 COPY --from=native-build /usr/local /usr/local
 COPY --from=native-build ${WS_DIR}/install ${WS_DIR}/install
+RUN ldconfig
 COPY dockerfiles/px4_connector_entrypoint.sh /px4_connector_entrypoint.sh
 RUN chmod +x /px4_connector_entrypoint.sh
 

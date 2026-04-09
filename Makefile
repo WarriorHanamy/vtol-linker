@@ -56,7 +56,7 @@ docker-build-lio-jetson: check-network
 	@echo "[3/4] Loading prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(LIO_PREP_ARCHIVE))"
 	@echo "[4/4] Building final LIO image natively on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build -f $(LIO_REMOTE_BUILD_DIR)/dockerfiles/lio.native.Dockerfile --build-arg PREP_IMAGE=$(LIO_PREP_IMAGE) -t $(LIO_IMAGE) $(LIO_REMOTE_BUILD_DIR)"
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build --network=host -f $(LIO_REMOTE_BUILD_DIR)/dockerfiles/lio.native.Dockerfile --build-arg PREP_IMAGE=$(LIO_PREP_IMAGE) -t $(LIO_IMAGE) $(LIO_REMOTE_BUILD_DIR)"
 
 .PHONY: docker-build-px4-connector-jetson
 docker-build-px4-connector-jetson: check-network
@@ -76,7 +76,7 @@ docker-build-px4-connector-jetson: check-network
 	@echo "[3/4] Loading PX4 prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(PX4_CONNECTOR_PREP_ARCHIVE))"
 	@echo "[4/4] Building final PX4 image natively on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build -f $(PX4_CONNECTOR_REMOTE_BUILD_DIR)/dockerfiles/px4_connector.native.Dockerfile --build-arg PREP_IMAGE=$(PX4_CONNECTOR_PREP_IMAGE) -t $(PX4_CONNECTOR_IMAGE) $(PX4_CONNECTOR_REMOTE_BUILD_DIR)"
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build --network=host -f $(PX4_CONNECTOR_REMOTE_BUILD_DIR)/dockerfiles/px4_connector.native.Dockerfile --build-arg PREP_IMAGE=$(PX4_CONNECTOR_PREP_IMAGE) -t $(PX4_CONNECTOR_IMAGE) $(PX4_CONNECTOR_REMOTE_BUILD_DIR)"
 
 
 .PHONY: docker-build-calib-jetson
@@ -97,7 +97,7 @@ docker-build-calib-jetson: check-network
 	@echo "[3/4] Loading calibration prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(CALIB_PREP_ARCHIVE))"
 	@echo "[4/4] Building final calibration image natively on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build -f $(CALIB_REMOTE_BUILD_DIR)/dockerfiles/calib_lidar_imu_init.native.Dockerfile --build-arg PREP_IMAGE=$(CALIB_PREP_IMAGE) -t $(CALIB_IMAGE) $(CALIB_REMOTE_BUILD_DIR)"
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build --network=host -f $(CALIB_REMOTE_BUILD_DIR)/dockerfiles/calib_lidar_imu_init.native.Dockerfile --build-arg PREP_IMAGE=$(CALIB_PREP_IMAGE) -t $(CALIB_IMAGE) $(CALIB_REMOTE_BUILD_DIR)"
 
 
 .PHONY: docker-run-lio-jetson
