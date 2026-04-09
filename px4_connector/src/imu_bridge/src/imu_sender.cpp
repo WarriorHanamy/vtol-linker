@@ -18,10 +18,11 @@ namespace
 constexpr const char* kSocketPath = "/tmp/imu_bridge.sock";
 constexpr const char* kTimesyncTopic = "/fmu/out/timesync_status";
 constexpr const char* kImuTopic = "/fmu/out/highres_imu_flu";
+constexpr int kSystematicDeltaSampleCount = 100;
 
 struct ImuData
 {
-    uint64_t timestamp;  // nanoseconds (ROS time, with offset applied)
+    uint64_t timestamp;  // nanoseconds (ROS time, after offset and systematic delta)
     float accel[3];      // m/s^2 (FLU frame)
     float gyro[3];       // rad/s (FLU frame)
 };
@@ -36,6 +37,11 @@ public:
       socket_fd_(-1),
       smoothed_offset_us_(0),
       has_offset_(false),
+      using_fallback_offset_(false),
+      has_systematic_delta_(false),
+      systematic_delta_ns_(0),
+      systematic_delta_sample_count_(0),
+      systematic_delta_sum_ns_(0),
       msg_count_(0)
     {
         socket_path_ = declare_parameter<std::string>("socket_path", kSocketPath);
@@ -75,11 +81,31 @@ private:
         smoothed_offset_us_ = static_cast<int64_t>(msg->estimated_offset);
         has_offset_ = true;
 
+        if (using_fallback_offset_)
+        {
+            using_fallback_offset_ = false;
+            reset_systematic_delta(
+                "TimesyncStatus received, restarting 100-sample systematic delta calibration");
+        }
+
         RCLCPP_DEBUG(get_logger(),
             "TimesyncStatus: offset=%ld us, RTT=%u us, protocol=%u",
             msg->estimated_offset,
             msg->round_trip_time,
             msg->source_protocol);
+    }
+
+    void reset_systematic_delta(const char* reason)
+    {
+        has_systematic_delta_ = false;
+        systematic_delta_ns_ = 0;
+        systematic_delta_sample_count_ = 0;
+        systematic_delta_sum_ns_ = 0;
+
+        if (reason != nullptr)
+        {
+            RCLCPP_INFO(get_logger(), "%s", reason);
+        }
     }
 
     void setup_socket()
@@ -101,45 +127,66 @@ private:
 
     void imu_callback(const px4_msgs::msg::HighresImu::SharedPtr msg)
     {
-        // Use TimesyncStatus offset if available; fallback to static offset on first message
         if (!has_offset_)
         {
-            static bool warned = false;
-            if (!warned)
-            {
-                RCLCPP_WARN_ONCE(get_logger(),
-                    "TimesyncStatus not received yet, using static offset from first IMU message");
-                warned = true;
-            }
+            RCLCPP_WARN_ONCE(get_logger(),
+                "TimesyncStatus not received yet, using static offset from first IMU message");
 
-            // One-time static offset (original behavior, but with unit fix)
-            static uint64_t first_timestamp_sample_us = 0;
-            static uint64_t first_ros_time_ns = 0;
-            static bool first_msg = true;
+            const int64_t first_ros_time_ns = now().nanoseconds();
+            smoothed_offset_us_ = first_ros_time_ns / 1000 - static_cast<int64_t>(msg->timestamp_sample);
+            has_offset_ = true;
+            using_fallback_offset_ = true;
+            reset_systematic_delta(nullptr);
 
-            if (first_msg)
-            {
-                first_timestamp_sample_us = msg->timestamp_sample;
-                first_ros_time_ns = now().nanoseconds();
-                smoothed_offset_us_ = static_cast<int64_t>(first_ros_time_ns / 1000 - first_timestamp_sample_us);
-                has_offset_ = true;
-                first_msg = false;
-
-                RCLCPP_INFO(get_logger(),
-                    "Static offset: %ld ns (%.3f s)",
-                    smoothed_offset_us_ * 1000,
-                    smoothed_offset_us_ / 1e6);
-            }
+            RCLCPP_INFO(get_logger(),
+                "Static offset initialized: %lld ns (%.3f s)",
+                static_cast<long long>(smoothed_offset_us_ * 1000),
+                smoothed_offset_us_ / 1e6);
         }
 
-        // Convert PX4 timestamp_sample (μs) to ROS time (ns) using offset (μs)
-        // ros_time_ns = timestamp_sample_us * 1000 + offset_us * 1000
-        uint64_t imu_time_ns = static_cast<uint64_t>(
-            static_cast<int64_t>(msg->timestamp_sample) * 1000 +
-            smoothed_offset_us_ * 1000);
+        const int64_t ros_now_ns = now().nanoseconds();
+        const int64_t imu_ros_time_ns =
+            (static_cast<int64_t>(msg->timestamp_sample) + smoothed_offset_us_) * 1000;
+
+        if (!has_systematic_delta_)
+        {
+            if (systematic_delta_sample_count_ == 0)
+            {
+                RCLCPP_INFO(get_logger(),
+                    "Collecting %d IMU samples to estimate systematic delta",
+                    kSystematicDeltaSampleCount);
+            }
+
+            const int64_t delta_ns = ros_now_ns - imu_ros_time_ns;
+            systematic_delta_sum_ns_ += static_cast<__int128>(delta_ns);
+            systematic_delta_sample_count_++;
+
+            if (systematic_delta_sample_count_ >= kSystematicDeltaSampleCount)
+            {
+                systematic_delta_ns_ = static_cast<int64_t>(
+                    systematic_delta_sum_ns_ / systematic_delta_sample_count_);
+                has_systematic_delta_ = true;
+                RCLCPP_INFO(get_logger(),
+                    "Systematic delta computed from %d IMU samples: %lld ns (%.3f ms)",
+                    systematic_delta_sample_count_,
+                    static_cast<long long>(systematic_delta_ns_),
+                    systematic_delta_ns_ / 1e6);
+            }
+
+            return;
+        }
+
+        const int64_t final_imu_time_ns = imu_ros_time_ns + systematic_delta_ns_;
+        if (final_imu_time_ns <= 0)
+        {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                "Converted IMU timestamp is non-positive after ROS clock alignment: %lld ns",
+                static_cast<long long>(final_imu_time_ns));
+            return;
+        }
 
         ImuData data;
-        data.timestamp = imu_time_ns;
+        data.timestamp = static_cast<uint64_t>(final_imu_time_ns);
         data.accel[0] = msg->accel[0];
         data.accel[1] = msg->accel[1];
         data.accel[2] = msg->accel[2];
@@ -162,25 +209,28 @@ private:
                 "Failed to send datagram: %s", strerror(errno));
         }
 
-        // Diagnostic verification: print ros_now vs imu_time every log_interval messages
+        // Diagnostic verification after ROS clock alignment
         msg_count_++;
         if (msg_count_ % log_interval_ == 0)
         {
-            uint64_t ros_now_ns = now().nanoseconds();
-            int64_t delta_us = static_cast<int64_t>(ros_now_ns - imu_time_ns) / 1000;
+            const int64_t verify_ros_now_ns = now().nanoseconds();
+            const int64_t final_delta_us = (verify_ros_now_ns - final_imu_time_ns) / 1000;
 
             RCLCPP_INFO(get_logger(),
-                "TimeSync verify: ros_now=%lu imu_time=%lu delta=%ld us (%.1f ms) %s",
-                ros_now_ns,
-                imu_time_ns,
-                delta_us,
-                delta_us / 1000.0,
-                (delta_us < 0) ? "[FAIL: ros_now < imu_time]" : "[OK]");
+                "TimeSync verify: source=%s ros_now=%lld imu_time=%lld systematic_delta=%lld us final_delta=%lld us (%.1f ms) %s",
+                using_fallback_offset_ ? "fallback" : "timesync",
+                static_cast<long long>(verify_ros_now_ns),
+                static_cast<long long>(final_imu_time_ns),
+                static_cast<long long>(systematic_delta_ns_ / 1000),
+                static_cast<long long>(final_delta_us),
+                final_delta_us / 1000.0,
+                (final_delta_us < 0) ? "[FAIL: ros_now < imu_time]" : "[OK]");
 
-            if (delta_us < 0)
+            if (final_delta_us < 0)
             {
                 RCLCPP_WARN(get_logger(),
-                    "Time sync error: ros_now is BEHIND imu_time by %ld us", -delta_us);
+                    "Time sync error: ros_now is BEHIND imu_time by %lld us",
+                    static_cast<long long>(-final_delta_us));
             }
         }
     }
@@ -190,6 +240,11 @@ private:
     struct sockaddr_un dest_addr_;      // Receiver address for sendto()
     int64_t smoothed_offset_us_;        // PX4 estimated offset (microseconds)
     bool has_offset_;                   // true once TimesyncStatus received or fallback computed
+    bool using_fallback_offset_;        // true while using first-sample fallback offset
+    bool has_systematic_delta_;         // true once the 100-sample systematic delta is ready
+    int64_t systematic_delta_ns_;       // average residual delta after converting PX4 time to ROS time
+    int systematic_delta_sample_count_; // number of IMU samples collected for systematic delta
+    __int128 systematic_delta_sum_ns_;  // sum of residual deltas across initial IMU samples
     uint64_t msg_count_;                // for periodic diagnostics
     int log_interval_;                  // diagnostic print interval
 
