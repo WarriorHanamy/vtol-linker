@@ -41,7 +41,7 @@ public:
         socket_path_ = declare_parameter<std::string>("socket_path", kSocketPath);
         log_interval_ = declare_parameter<int>("log_interval", 1000);
 
-        connect_socket();
+        setup_socket();
 
         // Subscribe to TimesyncStatus for smoothed time offset
         timesync_subscription_ = create_subscription<px4_msgs::msg::TimesyncStatus>(
@@ -58,7 +58,7 @@ public:
             std::bind(&ImuSender::imu_callback, this, std::placeholders::_1));
 
         RCLCPP_INFO(get_logger(), "Subscribed to %s", kImuTopic);
-        RCLCPP_INFO(get_logger(), "Sending to Unix socket: %s", socket_path_.c_str());
+        RCLCPP_INFO(get_logger(), "Sending via Unix datagram to: %s", socket_path_.c_str());
     }
 
     ~ImuSender() override
@@ -82,36 +82,21 @@ private:
             msg->source_protocol);
     }
 
-private:
-    void connect_socket()
+    void setup_socket()
     {
-        if (socket_fd_ >= 0)
-        {
-            close(socket_fd_);
-        }
-
-        socket_fd_ = socket(AF_UNIX, SOCK_STREAM, 0);
+        socket_fd_ = socket(AF_UNIX, SOCK_DGRAM, 0);
         if (socket_fd_ < 0)
         {
-            RCLCPP_WARN(get_logger(), "Failed to create socket: %s", strerror(errno));
+            RCLCPP_ERROR(get_logger(), "Failed to create datagram socket: %s", strerror(errno));
             return;
         }
 
-        struct sockaddr_un addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sun_family = AF_UNIX;
-        strncpy(addr.sun_path, socket_path_.c_str(), sizeof(addr.sun_path) - 1);
+        // Prepare destination address (receiver's socket path)
+        memset(&dest_addr_, 0, sizeof(dest_addr_));
+        dest_addr_.sun_family = AF_UNIX;
+        strncpy(dest_addr_.sun_path, socket_path_.c_str(), sizeof(dest_addr_.sun_path) - 1);
 
-        if (connect(socket_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-        {
-            RCLCPP_WARN(get_logger(), "Failed to connect to socket: %s (will retry)", strerror(errno));
-            close(socket_fd_);
-            socket_fd_ = -1;
-        }
-        else
-        {
-            RCLCPP_INFO(get_logger(), "Connected to Unix socket");
-        }
+        RCLCPP_INFO(get_logger(), "Datagram socket created, sending to %s", socket_path_.c_str());
     }
 
     void imu_callback(const px4_msgs::msg::HighresImu::SharedPtr msg)
@@ -164,19 +149,17 @@ private:
 
         if (socket_fd_ < 0)
         {
-            connect_socket();
-            if (socket_fd_ < 0)
-            {
-                return;
-            }
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                "Socket not initialized, skipping IMU message");
+            return;
         }
 
-        ssize_t sent = send(socket_fd_, &data, sizeof(data), MSG_NOSIGNAL);
+        ssize_t sent = sendto(socket_fd_, &data, sizeof(data), MSG_NOSIGNAL,
+                              (struct sockaddr*)&dest_addr_, sizeof(dest_addr_));
         if (sent < 0)
         {
-            RCLCPP_WARN(get_logger(), "Failed to send data: %s (reconnecting)", strerror(errno));
-            close(socket_fd_);
-            socket_fd_ = -1;
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                "Failed to send datagram: %s", strerror(errno));
         }
 
         // Diagnostic verification: print ros_now vs imu_time every log_interval messages
@@ -204,10 +187,11 @@ private:
 
     std::string socket_path_;
     int socket_fd_;
-    int64_t smoothed_offset_us_;       // PX4 estimated offset (microseconds)
-    bool has_offset_;                  // true once TimesyncStatus received or fallback computed
-    uint64_t msg_count_;               // for periodic diagnostics
-    int log_interval_;                 // diagnostic print interval
+    struct sockaddr_un dest_addr_;      // Receiver address for sendto()
+    int64_t smoothed_offset_us_;        // PX4 estimated offset (microseconds)
+    bool has_offset_;                   // true once TimesyncStatus received or fallback computed
+    uint64_t msg_count_;                // for periodic diagnostics
+    int log_interval_;                  // diagnostic print interval
 
     rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr timesync_subscription_;
     rclcpp::Subscription<px4_msgs::msg::HighresImu>::SharedPtr imu_subscription_;

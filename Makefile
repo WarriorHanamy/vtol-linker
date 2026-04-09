@@ -5,9 +5,8 @@ IMAGE_SUFFIX ?= jetson
 DATA_DIR ?= $(CURDIR)/data
 
 BAG ?=
-LAUNCH ?= mid360.launch
+LAUNCH ?= calib_with_imu.launch
 PLAY_RATE ?=
-IMU_BRIDGE ?= false
 
 # Deployment configuration (fixed convention)
 HOST_IP := 192.168.55.100
@@ -42,6 +41,7 @@ PX4_CONNECTOR_REMOTE_BUILD_DIR := $(REMOTE_DIR)/px4-connector-native
 docker-build-lio-jetson: check-network
 	@echo "[1/4] Building prep image locally for $(PLATFORM)..."
 	@mkdir -p $(IMAGE_DIR)
+	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
 		-f dockerfiles/lio.perp.Dockerfile \
@@ -62,6 +62,7 @@ docker-build-lio-jetson: check-network
 docker-build-px4-connector-jetson: check-network
 	@echo "[1/4] Building PX4 prep image locally for $(PLATFORM)..."
 	@mkdir -p $(IMAGE_DIR)
+	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
 		-f dockerfiles/px4_connector.perp.Dockerfile \
@@ -83,6 +84,7 @@ docker-build-px4-connector-jetson: check-network
 docker-build-calib-jetson: check-network
 	@echo "[1/4] Building calibration prep image locally for $(PLATFORM)..."
 	@mkdir -p $(IMAGE_DIR)
+	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
 	$(DOCKER) buildx build \
 		--platform $(PLATFORM) \
 		-f dockerfiles/calib_lidar_imu_init.perp.Dockerfile \
@@ -93,7 +95,7 @@ docker-build-calib-jetson: check-network
 	@echo "[2/4] Shipping calibration prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(CALIB_REMOTE_BUILD_DIR) && mkdir -p $(CALIB_REMOTE_BUILD_DIR)/dockerfiles"
 	@scp $(SSH_OPTS) $(CALIB_PREP_ARCHIVE) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
-	@scp $(SSH_OPTS) dockerfiles/calib_lidar_imu_init.native.Dockerfile dockerfiles/calib_entrypoint.sh dockerfiles/calib_run.sh $(DEVICE_USER)@$(DEVICE_IP):$(CALIB_REMOTE_BUILD_DIR)/dockerfiles/
+	@scp $(SSH_OPTS) dockerfiles/calib_lidar_imu_init.native.Dockerfile dockerfiles/calib_entrypoint.sh dockerfiles/calib_run.sh dockerfiles/calib_with_imu.launch $(DEVICE_USER)@$(DEVICE_IP):$(CALIB_REMOTE_BUILD_DIR)/dockerfiles/
 	@echo "[3/4] Loading calibration prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(CALIB_PREP_ARCHIVE))"
 	@echo "[4/4] Building final calibration image natively on Jetson..."
@@ -107,11 +109,14 @@ docker-run-lio-jetson:
 		--ipc=host \
 		$(LIO_IMAGE)
 
-.PHONY: docker-run-calib-jetson
-docker-run-calib-jetson:
-ifndef BAG
-	$(error BAG is required. Usage: make docker-run-calib-jetson BAG=calibration.bag)
-endif
+.PHONY: check-bag docker-run-calib-jetson
+check-bag:
+	@if [ -z "$(strip $(BAG))" ]; then \
+		echo "BAG is required. Usage: make docker-run-calib-jetson BAG=calibration.bag"; \
+		exit 1; \
+	fi
+
+docker-run-calib-jetson: check-bag
 	@mkdir -p $(DATA_DIR)
 	$(DOCKER) run --rm \
 		--net=host \
@@ -121,7 +126,6 @@ endif
 		/usr/local/bin/calib_run.sh \
 		$(if $(LAUNCH),--launch $(LAUNCH)) \
 		$(if $(PLAY_RATE),--rate $(PLAY_RATE)) \
-		$(if $(filter true,$(IMU_BRIDGE)),--imu-bridge,) \
 		/data/$(BAG)
 
 
@@ -182,4 +186,3 @@ check-network:
 	fi
 	@echo "[INFO] Device $(DEVICE_IP) reachable"
 	@echo "[INFO] Network convention check passed"
-

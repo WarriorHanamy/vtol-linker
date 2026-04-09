@@ -1,5 +1,11 @@
 #include <cstring>
 #include <string>
+#include <deque>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include <atomic>
+#include <chrono>
 
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
@@ -32,7 +38,8 @@ public:
     : nh_(nh),
       pnh_(pnh),
       server_fd_(-1),
-      client_fd_(-1)
+      running_(true),
+      buffer_max_size_(2000)  // ~2 seconds at 1kHz
     {
         pnh_.param<std::string>("socket_path", socket_path_, kDefaultSocketPath);
         pnh_.param<std::string>("publish_topic", publish_topic_, kDefaultPublishTopic);
@@ -41,17 +48,25 @@ public:
 
         setup_socket();
 
-        ROS_INFO("IMU receiver ready");
+        // Start receiver and publisher threads
+        receiver_thread_ = std::thread(&ImuReceiver::receiver_loop, this);
+        publisher_thread_ = std::thread(&ImuReceiver::publisher_loop, this);
+
+        ROS_INFO("IMU receiver ready (DGRAM mode with ring buffer)");
         ROS_INFO("  Socket: %s", socket_path_.c_str());
         ROS_INFO("  Topic:  %s", publish_topic_.c_str());
+        ROS_INFO("  Buffer: max %d messages", buffer_max_size_);
     }
 
     ~ImuReceiver()
     {
-        if (client_fd_ >= 0)
-        {
-            close(client_fd_);
-        }
+        running_ = false;
+
+        if (receiver_thread_.joinable())
+            receiver_thread_.join();
+        if (publisher_thread_.joinable())
+            publisher_thread_.join();
+
         if (server_fd_ >= 0)
         {
             close(server_fd_);
@@ -61,21 +76,10 @@ public:
 
     void spin()
     {
-        ros::Rate rate(1000);  // 1kHz polling
-
+        // Just wait for ROS shutdown; receiver/publisher threads run independently
         while (ros::ok())
         {
-            if (client_fd_ < 0)
-            {
-                accept_client();
-            }
-            else
-            {
-                receive_data();
-            }
-
-            ros::spinOnce();
-            rate.sleep();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
 
@@ -85,10 +89,10 @@ private:
         // Remove existing socket file
         unlink(socket_path_.c_str());
 
-        server_fd_ = socket(AF_UNIX, SOCK_STREAM, 0);
+        server_fd_ = socket(AF_UNIX, SOCK_DGRAM, 0);
         if (server_fd_ < 0)
         {
-            ROS_ERROR("Failed to create server socket: %s", strerror(errno));
+            ROS_ERROR("Failed to create datagram socket: %s", strerror(errno));
             return;
         }
 
@@ -103,61 +107,67 @@ private:
 
         if (bind(server_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0)
         {
-            ROS_ERROR("Failed to bind socket: %s", strerror(errno));
+            ROS_ERROR("Failed to bind datagram socket: %s", strerror(errno));
             close(server_fd_);
             server_fd_ = -1;
             return;
         }
 
-        if (listen(server_fd_, 1) < 0)
-        {
-            ROS_ERROR("Failed to listen on socket: %s", strerror(errno));
-            close(server_fd_);
-            server_fd_ = -1;
-            return;
-        }
-
-        ROS_INFO("Unix socket server listening");
+        ROS_INFO("Unix datagram socket bound and listening");
     }
 
-    void accept_client()
+    void receiver_loop()
     {
-        if (server_fd_ < 0)
+        while (running_ && ros::ok())
         {
-            return;
-        }
+            ImuData data;
+            ssize_t received = recv(server_fd_, &data, sizeof(data), 0);
 
-        client_fd_ = accept(server_fd_, nullptr, nullptr);
-        if (client_fd_ >= 0)
-        {
-            ROS_INFO("Client connected");
+            if (received == sizeof(data))
+            {
+                std::lock_guard<std::mutex> lock(buffer_mutex_);
+                if (imu_buffer_.size() >= buffer_max_size_)
+                {
+                    // Drop oldest to preserve recency
+                    imu_buffer_.pop_front();
+                }
+                imu_buffer_.push_back(data);
+                buffer_cv_.notify_one();
+            }
+            else if (received < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+            {
+                ROS_WARN_THROTTLE(5.0, "Recv error: %s", strerror(errno));
+            }
 
-            // Set non-blocking
-            int flags = fcntl(client_fd_, F_GETFL, 0);
-            fcntl(client_fd_, F_SETFL, flags | O_NONBLOCK);
+            std::this_thread::sleep_for(std::chrono::microseconds(100)); // ~10kHz poll
         }
     }
 
-    void receive_data()
+    void publisher_loop()
     {
-        ImuData data;
-        ssize_t received = recv(client_fd_, &data, sizeof(data), 0);
+        while (running_ && ros::ok())
+        {
+            ImuData data;
+            bool has_data = false;
 
-        if (received == sizeof(data))
-        {
-            publish_imu(data);
-        }
-        else if (received == 0)
-        {
-            ROS_INFO("Client disconnected");
-            close(client_fd_);
-            client_fd_ = -1;
-        }
-        else if (received < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
-        {
-            ROS_WARN("Receive error: %s", strerror(errno));
-            close(client_fd_);
-            client_fd_ = -1;
+            {
+                std::unique_lock<std::mutex> lock(buffer_mutex_);
+                if (buffer_cv_.wait_for(lock, std::chrono::milliseconds(100),
+                    [this](){ return !imu_buffer_.empty() || !running_; }))
+                {
+                    if (!imu_buffer_.empty())
+                    {
+                        data = imu_buffer_.front();
+                        imu_buffer_.pop_front();
+                        has_data = true;
+                    }
+                }
+            }
+
+            if (has_data)
+            {
+                publish_imu(data);
+            }
         }
     }
 
@@ -202,7 +212,15 @@ private:
     std::string socket_path_;
     std::string publish_topic_;
     int server_fd_;
-    int client_fd_;
+
+    // Ring buffer and threading
+    std::deque<ImuData> imu_buffer_;
+    std::mutex buffer_mutex_;
+    std::condition_variable buffer_cv_;
+    std::thread receiver_thread_;
+    std::thread publisher_thread_;
+    std::atomic<bool> running_;
+    size_t buffer_max_size_;
 };
 
 int main(int argc, char** argv)

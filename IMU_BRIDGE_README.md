@@ -5,59 +5,30 @@ Minimal bridge to forward PX4 HighresIMU data from ROS2 to ROS1 for LiDAR IMU in
 ## Architecture
 
 ```
-PX4 → Micro-XRCE-DDS → /fmu/out/highres_imu_flu (ROS2) → [Unix Socket] → /mavros/imu/data_raw (ROS1) → LI-Init
+PX4 → Micro-XRCE-DDS → /fmu/out/highres_imu_flu (ROS2) → [Unix DGRAM Socket] → /mavros/imu/data_raw (ROS1) → LI-Init
 ```
 
 ## Components
 
 ### ROS2 Side (`px4_connector`)
-- **imu_sender_node**: Subscribes to `/fmu/out/highres_imu_flu` and sends via Unix socket
-- Time sync: Uses `timestamp_sample` + initial offset to match ROS time
+- **imu_sender_node**: Subscribes to `/fmu/out/highres_imu_flu` and sends via Unix datagram socket
+- Uses `timestamp_sample` + initial offset to match ROS time
+- Connectionless: no handshake, fire-and-forget datagrams
 
 ### ROS1 Side (`imu_bridge_ros1`)
-- **imu_receiver_node**: Receives from Unix socket and publishes to `/mavros/imu/data_raw`
+- **imu_receiver_node**: Receives from Unix datagram socket and publishes to `/mavros/imu/data_raw`
+- Uses **threaded ring buffer** (~2 seconds, 2000 messages):
+  - **Receiver thread**: polls socket @ ~10kHz, pushes to buffer (drops oldest if full)
+  - **Publisher thread**: pops from buffer, publishes to ROS at native rate
 - Converts nanoseconds to ROS time format
-
-## Usage
-
-### Build
-
-```bash
-# Build PX4 connector (includes imu_sender_node)
-make docker-build-px4-connector-jetson
-
-# Build calibration container (includes imu_receiver_node)
-make docker-build-calib-jetson
-```
-
-### Run with IMU Bridge
-
-```bash
-# Terminal 1: Start PX4 connector
-make docker-run-px4-connector-jetson
-
-# Terminal 2: Start calibration with IMU bridge
-make docker-run-calib-jetson BAG=your_data.bag IMU_BRIDGE=true
-```
-
-### Run without IMU Bridge (existing behavior)
-
-```bash
-make docker-run-calib-jetson BAG=your_data.bag
-```
-
-## Time Synchronization
-
-- Uses `timestamp_sample` (sensor sampling time) instead of `timestamp` (PX4 publish time)
-- Calculates initial offset on first message: `offset = ros_now - timestamp_sample`
-- Applies offset to all subsequent messages: `ros_time = timestamp_sample + offset`
-- Ensures continuous timestamps compatible with LI-Init
 
 ## Socket
 
 - Path: `/tmp/imu_bridge.sock`
-- Protocol: Unix domain socket (SOCK_STREAM)
+- Protocol: **Unix domain datagram (SOCK_DGRAM)** - connectionless, unordered, no reliability guarantees
 - Shared between containers via `--ipc=host`
+- No connection handshake; sender creates socket and calls `sendto()`, receiver binds once
+- Buffer: receiver-side ring buffer (2000 messages) absorbs rate mismatches
 
 ## Data Format
 
@@ -68,3 +39,12 @@ struct ImuData {
     float gyro[3];       // rad/s (FLU frame)
 };
 ```
+
+## Why DGRAM?
+
+- **Simplicity**: no connection lifecycle, no reconnect logic
+- **Low latency**: sender never blocks on connection state
+- **Receiver buffering**: ring buffer decouples sender/receiver rates, handles bursts
+- **Loss tolerance**: IMU stream is continuous; occasional dropped datagram acceptable for LI-Init (temporal alignment handles gaps)
+
+**Tradeoff**: no guaranteed delivery or ordering - acceptable for high-rate IMU where occasional packet loss doesn't break initialization.
