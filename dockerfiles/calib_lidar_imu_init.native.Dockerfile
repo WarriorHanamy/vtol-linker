@@ -46,16 +46,16 @@ RUN sed -i '/^target_link_libraries(li_init/i add_dependencies(li_init ${${PROJE
 
 RUN mkdir -p /data ${WS_DIR}/src/LiDAR_IMU_Init/result
 
-COPY dockerfiles/calib_entrypoint.sh /calib_entrypoint.sh
+COPY dockerfiles/assets/calib_entrypoint.sh /calib_entrypoint.sh
 RUN chmod +x /calib_entrypoint.sh
 
-COPY dockerfiles/calib_run.sh /usr/local/bin/calib_run.sh
+COPY dockerfiles/assets/calib_run.sh /usr/local/bin/calib_run.sh
 RUN chmod +x /usr/local/bin/calib_run.sh
 
-COPY dockerfiles/livox_mid360_integrated.launch /dockerfiles/livox_mid360_integrated.launch
-COPY dockerfiles/livox_mid360_integrated.launch ${WS_DIR}/src/LiDAR_IMU_Init/launch/livox_mid360_integrated.launch
-COPY dockerfiles/calib_with_imu.launch /dockerfiles/calib_with_imu.launch
-COPY dockerfiles/calib_with_imu.launch ${WS_DIR}/src/LiDAR_IMU_Init/launch/calib_with_imu.launch
+COPY dockerfiles/assets/livox_mid360_integrated.launch /dockerfiles/livox_mid360_integrated.launch
+COPY dockerfiles/assets/livox_mid360_integrated.launch ${WS_DIR}/src/LiDAR_IMU_Init/launch/livox_mid360_integrated.launch
+COPY dockerfiles/assets/calib_with_imu.launch /dockerfiles/calib_with_imu.launch
+COPY dockerfiles/assets/calib_with_imu.launch ${WS_DIR}/src/LiDAR_IMU_Init/launch/calib_with_imu.launch
 
 ENTRYPOINT ["/calib_entrypoint.sh"]
 CMD ["bash"]

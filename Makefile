@@ -95,7 +95,7 @@ docker-build-calib-jetson: check-network
 	@echo "[2/4] Shipping calibration prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(CALIB_REMOTE_BUILD_DIR) && mkdir -p $(CALIB_REMOTE_BUILD_DIR)/dockerfiles"
 	@scp $(SSH_OPTS) $(CALIB_PREP_ARCHIVE) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
-	@scp $(SSH_OPTS) dockerfiles/calib_lidar_imu_init.native.Dockerfile dockerfiles/calib_entrypoint.sh dockerfiles/calib_run.sh dockerfiles/calib_with_imu.launch $(DEVICE_USER)@$(DEVICE_IP):$(CALIB_REMOTE_BUILD_DIR)/dockerfiles/
+	@scp $(SSH_OPTS) -r dockerfiles/* $(DEVICE_USER)@$(DEVICE_IP):$(CALIB_REMOTE_BUILD_DIR)/dockerfiles/
 	@echo "[3/4] Loading calibration prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(CALIB_PREP_ARCHIVE))"
 	@echo "[4/4] Building final calibration image natively on Jetson..."

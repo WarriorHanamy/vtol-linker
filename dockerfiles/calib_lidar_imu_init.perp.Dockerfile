@@ -53,7 +53,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN pip3 install --no-cache-dir matplotlib
 
 WORKDIR /opt/calib-src
-COPY dockerfiles/livox_mid360_integrated.launch /dockerfiles/livox_mid360_integrated.launch
+COPY dockerfiles/assets/livox_mid360_integrated.launch /dockerfiles/livox_mid360_integrated.launch
 RUN wget -q "https://github.com/ceres-solver/ceres-solver/archive/refs/tags/${CERES_VERSION}.tar.gz" && \
     tar zxf "${CERES_VERSION}.tar.gz" && \
     rm -f "${CERES_VERSION}.tar.gz"
