@@ -56,7 +56,7 @@ COPY --from=native-build ${WS_DIR}/install ${WS_DIR}/install
 COPY --from=native-build ${WS_DIR}/src/livox_ros_driver2 ${WS_DIR}/src/livox_ros_driver2
 COPY --from=native-build ${WS_DIR}/src/FAST_LIO_ROS2 ${WS_DIR}/src/FAST_LIO_ROS2
 
-COPY dockerfiles/ros_entrypoint.sh /ros_entrypoint.sh
+COPY dockerfiles/assets/ros_entrypoint.sh /ros_entrypoint.sh
 RUN chmod +x /ros_entrypoint.sh
 
 ENTRYPOINT ["/ros_entrypoint.sh"]

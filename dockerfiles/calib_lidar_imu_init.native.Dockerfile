@@ -39,10 +39,13 @@ RUN mkdir -p "ceres-solver-${CERES_VERSION}/build" && \
 WORKDIR ${WS_DIR}
 SHELL ["/bin/bash", "-c"]
 
-RUN sed -i '/^target_link_libraries(li_init/i add_dependencies(li_init ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})' \
-    ${WS_DIR}/src/LiDAR_IMU_Init/CMakeLists.txt && \
-    source /opt/ros/noetic/setup.bash && \
-    catkin_make -j4
+# Apply patches from assets
+COPY dockerfiles/assets/LiDAR_IMU_Init_CMakeLists.txt ${WS_DIR}/src/LiDAR_IMU_Init/CMakeLists.txt
+COPY dockerfiles/assets/livox_ros_driver2_package.xml ${WS_DIR}/src/livox_ros_driver2/package.xml
+COPY dockerfiles/assets/patch_livox_ros_driver2_ros1_aarch64.py /tmp/patch_livox_ros_driver2_ros1_aarch64.py
+
+RUN python3 /tmp/patch_livox_ros_driver2_ros1_aarch64.py && \
+    source /opt/ros/noetic/setup.bash && catkin_make -j4
 
 RUN mkdir -p /data ${WS_DIR}/src/LiDAR_IMU_Init/result
 

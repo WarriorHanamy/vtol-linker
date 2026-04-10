@@ -62,6 +62,11 @@ WORKDIR ${WS_DIR}/src
 COPY LiDAR_IMU_Init ./LiDAR_IMU_Init
 COPY imu_bridge_ros1 ./imu_bridge_ros1
 COPY lidar_connector/livox_ros_driver2 ./livox_ros_driver2
+# Overwrite livox_ros_driver2 package.xml with fixed dependencies (add roscpp/rospy exec_depends)
+COPY dockerfiles/assets/livox_ros_driver2_package.xml ${WS_DIR}/src/livox_ros_driver2/package.xml
+COPY dockerfiles/assets/patch_livox_ros_driver2_ros1_aarch64.py /tmp/patch_livox_ros_driver2_ros1_aarch64.py
+
+RUN python3 /tmp/patch_livox_ros_driver2_ros1_aarch64.py
 
 # Patch LiDAR_IMU_Init to use livox_ros_driver2 instead of livox_ros_driver (v1)
 RUN sed -i 's/livox_ros_driver/livox_ros_driver2/g' \

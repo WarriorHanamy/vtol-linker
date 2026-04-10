@@ -34,6 +34,18 @@ LIO_REMOTE_BUILD_DIR := $(REMOTE_DIR)/lio-native
 PX4_CONNECTOR_REMOTE_BUILD_DIR := $(REMOTE_DIR)/px4-connector-native
 
 # ==============================================================================
+# Shipping macro
+# ==============================================================================
+# ship-to-device: copy prep archive and full dockerfiles/ to device
+# $(1) = prep archive path (local)
+# $(2) = remote build directory
+define ship-to-device
+  @ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(2) && mkdir -p $(2)/dockerfiles"
+  @scp $(SSH_OPTS) $(1) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
+  @scp $(SSH_OPTS) -r dockerfiles/ $(DEVICE_USER)@$(DEVICE_IP):$(2)/dockerfiles/
+endef
+
+# ==============================================================================
 # Build targets
 # ==============================================================================
 
@@ -50,9 +62,7 @@ docker-build-lio-jetson: check-network
 		--output type=docker,dest=$(LIO_PREP_ARCHIVE) \
 		.
 	@echo "[2/4] Shipping prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(LIO_REMOTE_BUILD_DIR) && mkdir -p $(LIO_REMOTE_BUILD_DIR)/dockerfiles"
-	@scp $(SSH_OPTS) $(LIO_PREP_ARCHIVE) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
-	@scp $(SSH_OPTS) dockerfiles/lio.native.Dockerfile dockerfiles/ros_entrypoint.sh $(DEVICE_USER)@$(DEVICE_IP):$(LIO_REMOTE_BUILD_DIR)/dockerfiles/
+	$(call ship-to-device,$(LIO_PREP_ARCHIVE),$(LIO_REMOTE_BUILD_DIR))
 	@echo "[3/4] Loading prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(LIO_PREP_ARCHIVE))"
 	@echo "[4/4] Building final LIO image natively on Jetson..."
@@ -71,9 +81,7 @@ docker-build-px4-connector-jetson: check-network
 		--output type=docker,dest=$(PX4_CONNECTOR_PREP_ARCHIVE) \
 		.
 	@echo "[2/4] Shipping PX4 prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(PX4_CONNECTOR_REMOTE_BUILD_DIR) && mkdir -p $(PX4_CONNECTOR_REMOTE_BUILD_DIR)/dockerfiles"
-	@scp $(SSH_OPTS) $(PX4_CONNECTOR_PREP_ARCHIVE) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
-	@scp $(SSH_OPTS) dockerfiles/px4_connector.native.Dockerfile dockerfiles/px4_connector_entrypoint.sh $(DEVICE_USER)@$(DEVICE_IP):$(PX4_CONNECTOR_REMOTE_BUILD_DIR)/dockerfiles/
+	$(call ship-to-device,$(PX4_CONNECTOR_PREP_ARCHIVE),$(PX4_CONNECTOR_REMOTE_BUILD_DIR))
 	@echo "[3/4] Loading PX4 prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(PX4_CONNECTOR_PREP_ARCHIVE))"
 	@echo "[4/4] Building final PX4 image natively on Jetson..."
@@ -93,9 +101,7 @@ docker-build-calib-jetson: check-network
 		--output type=docker,dest=$(CALIB_PREP_ARCHIVE) \
 		.
 	@echo "[2/4] Shipping calibration prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(CALIB_REMOTE_BUILD_DIR) && mkdir -p $(CALIB_REMOTE_BUILD_DIR)/dockerfiles"
-	@scp $(SSH_OPTS) $(CALIB_PREP_ARCHIVE) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
-	@scp $(SSH_OPTS) -r dockerfiles/* $(DEVICE_USER)@$(DEVICE_IP):$(CALIB_REMOTE_BUILD_DIR)/dockerfiles/
+	$(call ship-to-device,$(CALIB_PREP_ARCHIVE),$(CALIB_REMOTE_BUILD_DIR))
 	@echo "[3/4] Loading calibration prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(CALIB_PREP_ARCHIVE))"
 	@echo "[4/4] Building final calibration image natively on Jetson..."
