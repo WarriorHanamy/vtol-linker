@@ -18,4 +18,4 @@
 	url = https://github.com/WarriorHanamy/px4_msgs_msg.git
 [submodule "LiDAR_IMU_Init"]
 	path = LiDAR_IMU_Init
-	url = https://github.com/hku-mars/LiDAR_IMU_Init
+	url = https://github.com/WarriorHanamy/LI_init_ROS1.git

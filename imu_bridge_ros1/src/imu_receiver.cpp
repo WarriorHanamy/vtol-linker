@@ -39,7 +39,9 @@ public:
       pnh_(pnh),
       server_fd_(-1),
       running_(true),
-      buffer_max_size_(2000)  // ~2 seconds at 1kHz
+      buffer_max_size_(2000),  // ~2 seconds at 1kHz
+      msg_received_(0),
+      msg_published_(0)
     {
         pnh_.param<std::string>("socket_path", socket_path_, kDefaultSocketPath);
         pnh_.param<std::string>("publish_topic", publish_topic_, kDefaultPublishTopic);
@@ -133,6 +135,7 @@ private:
                 }
                 imu_buffer_.push_back(data);
                 buffer_cv_.notify_one();
+                msg_received_++;  // statistics
             }
             else if (received < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
             {
@@ -167,6 +170,19 @@ private:
             if (has_data)
             {
                 publish_imu(data);
+                msg_published_++;
+
+                // Periodic statistics log every 5 seconds
+                static auto last_log = std::chrono::steady_clock::now();
+                auto now = std::chrono::steady_clock::now();
+                if (now - last_log >= std::chrono::seconds(5))
+                {
+                    uint64_t received = msg_received_.load();
+                    uint64_t published = msg_published_.load();
+                    ROS_INFO("IMU bridge stats: received=%lu published=%lu dropped=%lu buffer=%zu",
+                             received, published, received - published, imu_buffer_.size());
+                    last_log = now;
+                }
             }
         }
     }
@@ -221,6 +237,10 @@ private:
     std::thread publisher_thread_;
     std::atomic<bool> running_;
     size_t buffer_max_size_;
+
+    // Statistics
+    std::atomic<uint64_t> msg_received_;
+    std::atomic<uint64_t> msg_published_;
 };
 
 int main(int argc, char** argv)
