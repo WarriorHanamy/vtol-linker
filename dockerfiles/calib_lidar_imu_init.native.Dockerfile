@@ -36,6 +36,12 @@ RUN mkdir -p "ceres-solver-${CERES_VERSION}/build" && \
     make -j4 && \
     make install
 
+WORKDIR /opt/livox-src/Livox-SDK2
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build --target livox_lidar_sdk_static -j4 && \
+    cp build/sdk_core/liblivox_lidar_sdk_static.a ${WS_DIR}/src/livox_ros_driver2/livox_sdk/lib/aarch64/liblivox_lidar_sdk_static.a && \
+    cp include/*.h ${WS_DIR}/src/livox_ros_driver2/livox_sdk/include/
+
 WORKDIR ${WS_DIR}
 SHELL ["/bin/bash", "-c"]
 

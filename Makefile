@@ -42,7 +42,7 @@ PX4_CONNECTOR_REMOTE_BUILD_DIR := $(REMOTE_DIR)/px4-connector-native
 define ship-to-device
   @ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(2) && mkdir -p $(2)/dockerfiles"
   @scp $(SSH_OPTS) $(1) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
-  @scp $(SSH_OPTS) -r dockerfiles/ $(DEVICE_USER)@$(DEVICE_IP):$(2)/dockerfiles/
+  @scp $(SSH_OPTS) -r dockerfiles/. $(DEVICE_USER)@$(DEVICE_IP):$(2)/dockerfiles/
 endef
 
 # ==============================================================================
