@@ -9,11 +9,12 @@ ENV ROS_DISTRO=humble
 ENV WS_DIR=/root/px4_connector_ws
 
 WORKDIR /tmp/agent
-RUN cd Micro-XRCE-DDS-Agent && \
-    mkdir -p build && cd build && \
-    cmake .. && \
-    make -j4 && \
-    make install && \
+# Build static to avoid shared-library version-script probes on Jetson.
+RUN cmake -S Micro-XRCE-DDS-Agent -B Micro-XRCE-DDS-Agent/build \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DUAGENT_BUILD_USAGE_EXAMPLES=OFF && \
+    cmake --build Micro-XRCE-DDS-Agent/build --parallel 4 && \
+    cmake --install Micro-XRCE-DDS-Agent/build && \
     ldconfig
 
 WORKDIR ${WS_DIR}
@@ -42,6 +43,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-nav-msgs \
+    ros-humble-sensor-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=native-build /usr/local /usr/local

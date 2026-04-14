@@ -3,7 +3,7 @@
 <package format="3">
   <name>imu_bridge</name>
   <version>0.0.1</version>
-  <description>Bridge PX4 HighresIMU to ROS1 via Unix socket</description>
+  <description>Bridge PX4 HighresIMU to a ROS 2 topic or Unix socket</description>
   <maintainer email="todo@todo.todo">todo</maintainer>
   <license>TODO</license>
 
@@ -11,6 +11,7 @@
 
   <depend>rclcpp</depend>
   <depend>px4_msgs</depend>
+  <depend>sensor_msgs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

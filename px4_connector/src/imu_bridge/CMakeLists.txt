@@ -8,9 +8,11 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(px4_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 add_executable(imu_sender_node src/imu_sender.cpp)
-ament_target_dependencies(imu_sender_node rclcpp px4_msgs)
+target_include_directories(imu_sender_node PRIVATE include)
+ament_target_dependencies(imu_sender_node rclcpp px4_msgs sensor_msgs)
 
 install(TARGETS
   imu_sender_node

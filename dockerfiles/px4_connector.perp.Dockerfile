@@ -29,6 +29,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     python3-colcon-common-extensions \
     ros-humble-eigen3-cmake-module \
     ros-humble-nav-msgs \
+    ros-humble-sensor-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/agent
