@@ -73,7 +73,6 @@ flowchart TB
 - **Node**: `imu_sender_node`
 - **Input ROS2 Topics**:
   - `/fmu/out/highres_imu_flu` (`px4_msgs/msg/HighresImu`)
-  - `/fmu/out/timesync_status` (`px4_msgs/msg/TimesyncStatus`)
 - **Outputs** (mode-dependent):
   - **Socket mode** (`output_mode:=socket`): Unix datagram socket `/tmp/imu_bridge.sock`
   - **Topic mode** (`output_mode:=topic`): ROS2 topic `/px4/imu` (`sensor_msgs/Imu`)
@@ -201,7 +200,6 @@ struct ImuData {
 | Layer | Direction | Topic | Type | Node |
 |-------|-----------|-------|------|------|
 | ROS2 | SUB | `/fmu/out/highres_imu_flu` | `HighresImu` | `imu_sender_node` |
-| ROS2 | SUB | `/fmu/out/timesync_status` | `TimesyncStatus` | `imu_sender_node` |
 | Socket | OUT | `/tmp/imu_bridge.sock` | binary DGRAM | `imu_sender_node` |
 | Socket | IN | `/tmp/imu_bridge.sock` | binary DGRAM | `imu_receiver_node` |
 | ROS1 | PUB | `/mavros/imu/data_raw` | `Imu` | `imu_receiver_node` |
@@ -216,7 +214,6 @@ struct ImuData {
 | Layer | Direction | Topic | Type | Node |
 |-------|-----------|-------|------|------|
 | ROS2 | SUB | `/fmu/out/highres_imu_flu` | `HighresImu` | `imu_sender_node` |
-| ROS2 | SUB | `/fmu/out/timesync_status` | `TimesyncStatus` | `imu_sender_node` |
 | ROS2 | PUB | `/px4/imu` | `Imu` | `imu_sender_node` |
 | ROS2 | PUB | `/livox/lidar` | `PointCloud2` | `livox_lidar_publisher2` |
 | ROS2 | SUB | `/livox/lidar` | `PointCloud2` | `laserMapping` |

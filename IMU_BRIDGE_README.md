@@ -11,11 +11,13 @@ PX4 → Micro-XRCE-DDS → /fmu/out/highres_imu_flu (ROS2) → [Unix DGRAM Socke
 ## Components
 
 ### ROS2 Side (`px4_connector`)
+
 - **imu_sender_node**: Subscribes to `/fmu/out/highres_imu_flu` and sends via Unix datagram socket
-- Uses `timestamp_sample` + initial offset to match ROS time
+- `timestamp_sample` already as ROS2 time (nanoseconds)
 - Connectionless: no handshake, fire-and-forget datagrams
 
 ### ROS1 Side (`imu_bridge_ros1`)
+
 - **imu_receiver_node**: Receives from Unix datagram socket and publishes to `/mavros/imu/data_raw`
 - Uses **threaded ring buffer** (~2 seconds, 2000 messages):
   - **Receiver thread**: polls socket @ ~10kHz, pushes to buffer (drops oldest if full)
