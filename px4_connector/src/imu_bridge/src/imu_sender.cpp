@@ -42,14 +42,10 @@ public:
       RCLCPP_INFO(get_logger(), "Output mode: socket (path: %s)",
                   socket_path_.c_str());
     } else if (output_mode_ == "topic") {
-      imu_publisher_ = create_publisher<sensor_msgs::msg::Imu>(
-          output_topic_, rclcpp::SensorDataQoS());
+      imu_publisher_ = create_publisher<sensor_msgs::msg::Imu>(output_topic_,
+                                                               rclcpp::QoS(10));
       RCLCPP_INFO(get_logger(), "Output mode: topic (%s)",
                   output_topic_.c_str());
-    } else {
-      RCLCPP_ERROR(get_logger(),
-                   "Invalid output_mode: %s (expected 'topic' or 'socket')",
-                   output_mode_.c_str());
     }
 
     // 订阅 IMU 数据
