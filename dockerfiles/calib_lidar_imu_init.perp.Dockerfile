@@ -61,7 +61,6 @@ RUN wget -q "https://github.com/ceres-solver/ceres-solver/archive/refs/tags/${CE
 
 WORKDIR ${WS_DIR}/src
 COPY LiDAR_IMU_Init ./LiDAR_IMU_Init
-COPY imu_bridge_ros1 ./imu_bridge_ros1
 COPY lidar_connector/livox_ros_driver2 ./livox_ros_driver2
 # Overwrite livox_ros_driver2 package.xml with fixed dependencies (add roscpp/rospy exec_depends)
 COPY dockerfiles/assets/livox_ros_driver2_package.xml ${WS_DIR}/src/livox_ros_driver2/package.xml

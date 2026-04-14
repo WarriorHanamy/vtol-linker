@@ -83,7 +83,7 @@ flowchart TB
 - **DDS**: FastRTPS with `fastdds-debug.xml` profile
 - **ROS Domain**: `30`
 
-### 2. IMU Bridge (`imu_bridge_ros1/`)
+### 2. IMU Bridge (`LiDAR_IMU_Init/imu_bridge_ros1/`)
 
 **Role**: ROS1 receiver node (used only in LI-Init mode).
 
@@ -313,16 +313,8 @@ linker/
 │   ├── px4_connector.native.Dockerfile
 │   ├── lio.perp.Dockerfile
 │   └── lio.native.Dockerfile
-├── imu_bridge_ros1/                  # ROS1 receiver node source
-│   └── src/imu_receiver_node.cpp
-├── px4_connector/                    # ROS2 sender node source
-│   ├── imu_bridge/
-│   │   ├── imu_sender_node.cpp
-│   │   ├── imu_sender_node.hpp
-│   │   └── launch/
-│   │       └── sender.launch.py
-│   └── CMakeLists.txt
-├── LiDAR_IMU_Init/                   # LI-Init algorithm (submodule)
+│   ├── imu_bridge_ros1/              # ROS1 receiver node
+│   │   └── src/imu_receiver.cpp
 │   ├── src/lidar_imu_init/           # laserMapping node
 │   ├── launch/livox_mid360_integrated.launch
 │   ├── config/fastlio_mid360.yaml
