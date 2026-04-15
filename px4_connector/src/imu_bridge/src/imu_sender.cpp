@@ -1,9 +1,14 @@
+#include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
+#include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 
 #include <px4_msgs/msg/highres_imu.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -17,6 +22,7 @@ namespace {
 
 constexpr const char *kSocketPath = "/tmp/imu_bridge.sock";
 constexpr const char *kImuTopic = "/fmu/out/highres_imu_flu";
+constexpr size_t kPx4ImuDepth = 40;
 
 struct ImuData {
   uint64_t timestamp; // nanoseconds (ROS2 time, directly from timestamp_sample)
@@ -30,7 +36,7 @@ class ImuSender : public rclcpp::Node {
 public:
   ImuSender()
       : Node("imu_sender_node"), socket_fd_(-1), output_mode_("topic"),
-        output_topic_("/px4/imu") {
+        output_topic_("/px4/imu"), running_(true), dropped_topic_messages_(0) {
     // 声明参数
     socket_path_ = declare_parameter<std::string>("socket_path", kSocketPath);
     output_mode_ = declare_parameter<std::string>("output_mode", "topic");
@@ -42,8 +48,11 @@ public:
       RCLCPP_INFO(get_logger(), "Output mode: socket (path: %s)",
                   socket_path_.c_str());
     } else if (output_mode_ == "topic") {
+      auto output_qos = rclcpp::SensorDataQoS();
+      output_qos.keep_last(kPx4ImuDepth);
       imu_publisher_ = create_publisher<sensor_msgs::msg::Imu>(output_topic_,
-                                                               rclcpp::QoS(10));
+                                                               output_qos);
+      publisher_thread_ = std::thread(&ImuSender::topic_publish_loop, this);
       RCLCPP_INFO(get_logger(), "Output mode: topic (%s)",
                   output_topic_.c_str());
     }
@@ -57,6 +66,11 @@ public:
   }
 
   ~ImuSender() override {
+    running_ = false;
+    output_queue_cv_.notify_all();
+    if (publisher_thread_.joinable()) {
+      publisher_thread_.join();
+    }
     if (socket_fd_ >= 0) {
       close(socket_fd_);
     }
@@ -71,6 +85,12 @@ private:
   std::string output_topic_;
   rclcpp::Subscription<px4_msgs::msg::HighresImu>::SharedPtr imu_subscription_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher_;
+  std::deque<sensor_msgs::msg::Imu> output_queue_;
+  std::mutex output_queue_mutex_;
+  std::condition_variable output_queue_cv_;
+  std::thread publisher_thread_;
+  std::atomic<bool> running_;
+  std::atomic<uint64_t> dropped_topic_messages_;
 
   void imu_callback(const px4_msgs::msg::HighresImu::SharedPtr msg) {
     // timestamp_sample is already ROS2 time (nanoseconds) from MICRODDS AGENT
@@ -89,43 +109,90 @@ private:
 
     // 模式分发
     if (output_mode_ == "topic") {
-      publish_ros2_imu(timestamp_ns, msg);
+      queue_ros2_imu(timestamp_ns, msg);
     } else if (output_mode_ == "socket") {
       send_via_socket(socket_data);
     }
   }
 
-  void publish_ros2_imu(int64_t timestamp_ns,
-                        const px4_msgs::msg::HighresImu::SharedPtr &src) {
-    auto msg = std::make_unique<sensor_msgs::msg::Imu>();
+  sensor_msgs::msg::Imu build_ros2_imu(
+      int64_t timestamp_ns,
+      const px4_msgs::msg::HighresImu::SharedPtr &src) const {
+    sensor_msgs::msg::Imu msg;
 
     // Header
-    msg->header.stamp = rclcpp::Time(timestamp_ns);
-    msg->header.frame_id = "imu_link";
+    msg.header.stamp = rclcpp::Time(timestamp_ns);
+    msg.header.frame_id = "imu_link";
 
     // Linear acceleration (FLU frame)
-    msg->linear_acceleration.x = src->accel[0];
-    msg->linear_acceleration.y = src->accel[1];
-    msg->linear_acceleration.z = src->accel[2];
+    msg.linear_acceleration.x = src->accel[0];
+    msg.linear_acceleration.y = src->accel[1];
+    msg.linear_acceleration.z = src->accel[2];
 
     // Angular velocity (FLU frame)
-    msg->angular_velocity.x = src->gyro[0];
-    msg->angular_velocity.y = src->gyro[1];
-    msg->angular_velocity.z = src->gyro[2];
+    msg.angular_velocity.x = src->gyro[0];
+    msg.angular_velocity.y = src->gyro[1];
+    msg.angular_velocity.z = src->gyro[2];
 
     // Orientation unknown
-    msg->orientation_covariance[0] = -1;
+    msg.orientation_covariance[0] = -1;
 
     // Covariances (standard IMU values)
-    msg->linear_acceleration_covariance[0] = 0.01;
-    msg->linear_acceleration_covariance[4] = 0.01;
-    msg->linear_acceleration_covariance[8] = 0.01;
+    msg.linear_acceleration_covariance[0] = 0.01;
+    msg.linear_acceleration_covariance[4] = 0.01;
+    msg.linear_acceleration_covariance[8] = 0.01;
 
-    msg->angular_velocity_covariance[0] = 0.0001;
-    msg->angular_velocity_covariance[4] = 0.0001;
-    msg->angular_velocity_covariance[8] = 0.0001;
+    msg.angular_velocity_covariance[0] = 0.0001;
+    msg.angular_velocity_covariance[4] = 0.0001;
+    msg.angular_velocity_covariance[8] = 0.0001;
 
-    imu_publisher_->publish(std::move(msg));
+    return msg;
+  }
+
+  void queue_ros2_imu(int64_t timestamp_ns,
+                      const px4_msgs::msg::HighresImu::SharedPtr &src) {
+    auto msg = build_ros2_imu(timestamp_ns, src);
+
+    {
+      std::lock_guard<std::mutex> lock(output_queue_mutex_);
+      // Drop oldest samples so the input callback never blocks on the
+      // reliable /px4/imu publisher.
+      if (output_queue_.size() >= kPx4ImuDepth) {
+        output_queue_.pop_front();
+        dropped_topic_messages_.fetch_add(1, std::memory_order_relaxed);
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                             "IMU output queue full, dropping oldest sample "
+                             "(dropped=%llu)",
+                             static_cast<unsigned long long>(
+                                 dropped_topic_messages_.load(
+                                     std::memory_order_relaxed)));
+      }
+      output_queue_.push_back(std::move(msg));
+    }
+
+    output_queue_cv_.notify_one();
+  }
+
+  void topic_publish_loop() {
+    while (running_.load(std::memory_order_relaxed)) {
+      sensor_msgs::msg::Imu msg;
+      {
+        std::unique_lock<std::mutex> lock(output_queue_mutex_);
+        output_queue_cv_.wait(lock, [this]() {
+          return !running_.load(std::memory_order_relaxed) ||
+                 !output_queue_.empty();
+        });
+
+        if (!running_.load(std::memory_order_relaxed) && output_queue_.empty()) {
+          break;
+        }
+
+        msg = std::move(output_queue_.front());
+        output_queue_.pop_front();
+      }
+
+      imu_publisher_->publish(msg);
+    }
   }
 
   void setup_socket() {
