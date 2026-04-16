@@ -4,7 +4,7 @@
 	branch = feature/use-standard-unit
 [submodule "lidar_connector/FAST_LIO_ROS2"]
 	path = lidar_connector/FAST_LIO_ROS2
-	url = https://github.com/Ericsii/FAST_LIO_ROS2.git
+	url = https://github.com/WarriorHanamy/fastlio2-ros2.git
 	branch = ros2
 [submodule "lidar_connector/Livox-SDK2"]
 	path = lidar_connector/Livox-SDK2
