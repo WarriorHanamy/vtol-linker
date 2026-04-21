@@ -6,15 +6,13 @@ set -eo pipefail
 set +u
 source /opt/ros/humble/setup.bash
 
-WS_SETUP="${WS_DIR:-/root/px4_connector_ws}/install/setup.bash"
-if [ -f "$WS_SETUP" ]; then
-    source "$WS_SETUP"
-fi
+WS_SETUP="${WS_DIR:-/home/ros/ros2_ws}/install/setup.bash"
+source "$WS_SETUP"
 set -u
 
 echo "=== PX4 Connector Debug Shell ==="
 echo "ROS2 environment sourced."
-echo "Workspace: ${WS_DIR:-/root/px4_connector_ws}"
+echo "Workspace: ${WS_DIR:-/home/ros/ros2_ws}"
 echo ""
 
 exec bash

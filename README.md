@@ -307,12 +307,11 @@ linker/
 │   │   ├── calib_run.sh              # Calibration runner with bag support
 │   │   ├── px4_connector_entrypoint.sh
 │   │   └── px4_connector_debug_entrypoint.sh
-│   ├── calib_lidar_imu_init.perp.Dockerfile  # prep stage (cross-compile)
-│   ├── calib_lidar_imu_init.native.Dockerfile # final stage (native Jetson)
-│   ├── px4_connector.perp.Dockerfile
-│   ├── px4_connector.native.Dockerfile
-│   ├── lio.perp.Dockerfile
-│   └── lio.native.Dockerfile
+│   ├── l4t_ros2_base.Dockerfile       # shared Jetson L4T + ROS2 Humble base
+│   ├── lio.Dockerfile                 # native single-stage LIO build
+│   ├── px4_connector.Dockerfile       # native single-stage PX4 connector build
+│   ├── calib_lidar_imu_init.perp.Dockerfile   # legacy ROS1 prep stage
+│   └── calib_lidar_imu_init.native.Dockerfile # legacy ROS1 native stage
 │   ├── imu_bridge_ros1/              # ROS1 receiver node
 │   │   └── src/imu_receiver.cpp
 │   ├── src/lidar_imu_init/           # laserMapping node
@@ -339,15 +338,19 @@ linker/
 ```bash
 cd linker
 
-# Build all three images (cross-compile prep + native Jetson build via SSH)
+# Build the shared ROS2 base image once
+make docker-build-base-jetson
+
+# Build all three images from the host
 make docker-build-px4-connector-jetson
 make docker-build-calib-jetson
 make docker-build-lio-jetson
 ```
 
-**Two-stage build**:
-1. **Prep stage** (host, `linux/arm64`): cross-compile ROS2 workspace, export as `.tar` archive
-2. **Native stage** (Jetson via SSH): load archive, `docker build` with native `nvidia/cuda` base
+**Build model**:
+1. `docker-build-base-jetson` ships the repository with `rsync` and builds the shared L4T + ROS2 Humble base image on Jetson.
+2. `docker-build-px4-connector-jetson` and `docker-build-lio-jetson` ship the repository with `rsync` and perform native single-stage builds on Jetson.
+3. `docker-build-calib-jetson` keeps the existing prep + native flow because it still targets the ROS1 calibration stack.
 
 ### Run Production Pipeline
 

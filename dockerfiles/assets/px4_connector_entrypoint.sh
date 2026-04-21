@@ -6,10 +6,8 @@ set -eo pipefail
 set +u
 source /opt/ros/humble/setup.bash
 
-WS_SETUP="${WS_DIR:-/root/px4_connector_ws}/install/setup.bash"
-if [ -f "$WS_SETUP" ]; then
-    source "$WS_SETUP"
-fi
+WS_SETUP="${WS_DIR:-/home/ros/ros2_ws}/install/setup.bash"
+source "$WS_SETUP"
 set -u
 
 MICRO_XRCE_DEVICE="${MICRO_XRCE_DEVICE:-/dev/ttyTHS1}"

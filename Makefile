@@ -20,72 +20,70 @@ SSH_OPTS := $(if $(wildcard $(SSH_KEY)),-i $(SSH_KEY),)
 CALIB_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-$(IMAGE_SUFFIX):latest
 LIO_IMAGE := $(IMAGE_PREFIX)/lio-$(IMAGE_SUFFIX):latest
 PX4_CONNECTOR_IMAGE := $(IMAGE_PREFIX)/px4-connector-$(IMAGE_SUFFIX):latest
+ROS2_BASE_IMAGE := $(IMAGE_PREFIX)/l4t-ros2-base-$(IMAGE_SUFFIX):latest
 
 CALIB_PREP_IMAGE := $(IMAGE_PREFIX)/calib-lidar-imu-init-prep-$(IMAGE_SUFFIX):latest
-LIO_PREP_IMAGE := $(IMAGE_PREFIX)/lio-prep-$(IMAGE_SUFFIX):latest
-PX4_CONNECTOR_PREP_IMAGE := $(IMAGE_PREFIX)/px4-connector-prep-$(IMAGE_SUFFIX):latest
 
 CALIB_PREP_ARCHIVE := $(IMAGE_DIR)/calib-lidar-imu-init-prep-$(IMAGE_SUFFIX).tar
-LIO_PREP_ARCHIVE := $(IMAGE_DIR)/lio-prep-$(IMAGE_SUFFIX).tar
-PX4_CONNECTOR_PREP_ARCHIVE := $(IMAGE_DIR)/px4-connector-prep-$(IMAGE_SUFFIX).tar
 
+BASE_REMOTE_BUILD_DIR := $(REMOTE_DIR)/l4t-ros2-base
 CALIB_REMOTE_BUILD_DIR := $(REMOTE_DIR)/calib-native
 LIO_REMOTE_BUILD_DIR := $(REMOTE_DIR)/lio-native
 PX4_CONNECTOR_REMOTE_BUILD_DIR := $(REMOTE_DIR)/px4-connector-native
 
+BASE_CONTEXT_FILES := dockerfiles
+LIO_CONTEXT_FILES := dockerfiles lidar_connector
+PX4_CONNECTOR_CONTEXT_FILES := dockerfiles px4_connector
+CALIB_NATIVE_CONTEXT_FILES := dockerfiles
+
 # ==============================================================================
 # Shipping macro
 # ==============================================================================
-# ship-to-device: copy prep archive and full dockerfiles/ to device
+# ship-context-to-device: copy only required build context to device
+# $(1) = remote build directory
+# $(2) = file and directory list relative to repo root
+define ship-context-to-device
+  @ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(1) && mkdir -p $(1)"
+  @rsync -avzR -e "ssh $(SSH_OPTS)" $(2) $(DEVICE_USER)@$(DEVICE_IP):$(1)/
+endef
+
+# ship-calib-native-to-device: copy prep archive and minimal native context
 # $(1) = prep archive path (local)
 # $(2) = remote build directory
-define ship-to-device
-  @ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(2) && mkdir -p $(2)/dockerfiles"
+define ship-calib-native-to-device
+  @ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "rm -rf $(2) && mkdir -p $(2)"
   @scp $(SSH_OPTS) $(1) $(DEVICE_USER)@$(DEVICE_IP):$(REMOTE_DIR)/
-  @scp $(SSH_OPTS) -r dockerfiles/. $(DEVICE_USER)@$(DEVICE_IP):$(2)/dockerfiles/
+  @rsync -avzR -e "ssh $(SSH_OPTS)" $(CALIB_NATIVE_CONTEXT_FILES) $(DEVICE_USER)@$(DEVICE_IP):$(2)/
 endef
 
 # ==============================================================================
 # Build targets
 # ==============================================================================
 
+.PHONY: docker-build-base-jetson
+docker-build-base-jetson: check-network
+	@echo "[1/2] Shipping build context to $(DEVICE_USER)@$(DEVICE_IP)..."
+	$(call ship-context-to-device,$(BASE_REMOTE_BUILD_DIR),$(BASE_CONTEXT_FILES))
+	@echo "[2/2] Building shared L4T ROS2 base image on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(BASE_REMOTE_BUILD_DIR) && docker build --network=host -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
+
 .PHONY: docker-build-lio-jetson
 docker-build-lio-jetson: check-network
-	@echo "[1/4] Building prep image locally for $(PLATFORM)..."
-	@mkdir -p $(IMAGE_DIR)
-	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
-	$(DOCKER) buildx build \
-		--platform $(PLATFORM) \
-		-f dockerfiles/lio.perp.Dockerfile \
-		--target prep \
-		-t $(LIO_PREP_IMAGE) \
-		--output type=docker,dest=$(LIO_PREP_ARCHIVE) \
-		.
-	@echo "[2/4] Shipping prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
-	$(call ship-to-device,$(LIO_PREP_ARCHIVE),$(LIO_REMOTE_BUILD_DIR))
-	@echo "[3/4] Loading prep image on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(LIO_PREP_ARCHIVE))"
-	@echo "[4/4] Building final LIO image natively on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build --network=host -f $(LIO_REMOTE_BUILD_DIR)/dockerfiles/lio.native.Dockerfile --build-arg PREP_IMAGE=$(LIO_PREP_IMAGE) -t $(LIO_IMAGE) $(LIO_REMOTE_BUILD_DIR)"
+	@echo "[1/3] Shipping build context to $(DEVICE_USER)@$(DEVICE_IP)..."
+	$(call ship-context-to-device,$(LIO_REMOTE_BUILD_DIR),$(LIO_CONTEXT_FILES))
+	@echo "[2/3] Building shared L4T ROS2 base image on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(LIO_REMOTE_BUILD_DIR) && docker build --network=host -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
+	@echo "[3/3] Building final LIO image natively on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(LIO_REMOTE_BUILD_DIR) && docker build --network=host -f dockerfiles/lio.Dockerfile --build-arg BASE_IMAGE=$(ROS2_BASE_IMAGE) -t $(LIO_IMAGE) ."
 
 .PHONY: docker-build-px4-connector-jetson
 docker-build-px4-connector-jetson: check-network
-	@echo "[1/4] Building PX4 prep image locally for $(PLATFORM)..."
-	@mkdir -p $(IMAGE_DIR)
-	$(DOCKER) run --rm --privileged tonistiigi/binfmt --install arm64 || true
-	$(DOCKER) buildx build \
-		--platform $(PLATFORM) \
-		-f dockerfiles/px4_connector.perp.Dockerfile \
-		--target prep \
-		-t $(PX4_CONNECTOR_PREP_IMAGE) \
-		--output type=docker,dest=$(PX4_CONNECTOR_PREP_ARCHIVE) \
-		.
-	@echo "[2/4] Shipping PX4 prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
-	$(call ship-to-device,$(PX4_CONNECTOR_PREP_ARCHIVE),$(PX4_CONNECTOR_REMOTE_BUILD_DIR))
-	@echo "[3/4] Loading PX4 prep image on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(PX4_CONNECTOR_PREP_ARCHIVE))"
-	@echo "[4/4] Building final PX4 image natively on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build --network=host -f $(PX4_CONNECTOR_REMOTE_BUILD_DIR)/dockerfiles/px4_connector.native.Dockerfile --build-arg PREP_IMAGE=$(PX4_CONNECTOR_PREP_IMAGE) -t $(PX4_CONNECTOR_IMAGE) $(PX4_CONNECTOR_REMOTE_BUILD_DIR)"
+	@echo "[1/3] Shipping build context to $(DEVICE_USER)@$(DEVICE_IP)..."
+	$(call ship-context-to-device,$(PX4_CONNECTOR_REMOTE_BUILD_DIR),$(PX4_CONNECTOR_CONTEXT_FILES))
+	@echo "[2/3] Building shared L4T ROS2 base image on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(PX4_CONNECTOR_REMOTE_BUILD_DIR) && docker build --network=host -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
+	@echo "[3/3] Building final PX4 image natively on Jetson..."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(PX4_CONNECTOR_REMOTE_BUILD_DIR) && docker build --network=host -f dockerfiles/px4_connector.Dockerfile --build-arg BASE_IMAGE=$(ROS2_BASE_IMAGE) -t $(PX4_CONNECTOR_IMAGE) ."
 
 
 .PHONY: docker-build-calib-jetson
@@ -101,7 +99,7 @@ docker-build-calib-jetson: check-network
 		--output type=docker,dest=$(CALIB_PREP_ARCHIVE) \
 		.
 	@echo "[2/4] Shipping calibration prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
-	$(call ship-to-device,$(CALIB_PREP_ARCHIVE),$(CALIB_REMOTE_BUILD_DIR))
+	$(call ship-calib-native-to-device,$(CALIB_PREP_ARCHIVE),$(CALIB_REMOTE_BUILD_DIR))
 	@echo "[3/4] Loading calibration prep image on Jetson..."
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(CALIB_PREP_ARCHIVE))"
 	@echo "[4/4] Building final calibration image natively on Jetson..."

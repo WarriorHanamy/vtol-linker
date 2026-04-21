@@ -1,41 +1,29 @@
 # =============================================================
-# LIO prep image (FastLIO + local Livox ROS Driver2)
-#
-# This Dockerfile intentionally stops before any native compilation.
-# It is safe to build on the host with buildx and then hand off to
-# a Jetson-native Docker build for Livox-SDK2 and colcon.
+# LIO image for Jetson deployment (single-stage native build)
 # =============================================================
 
-FROM ros:humble-ros-base AS prep
+ARG BASE_IMAGE=vtol/l4t-ros2-base-jetson:latest
+FROM ${BASE_IMAGE}
+SHELL ["/bin/bash", "-c"]
 
-ARG UBUNTU_PORTS_MIRROR=http://mirrors.ustc.edu.cn/ubuntu-ports
-ARG ROS_MIRROR=https://mirrors.ustc.edu.cn/ros2/ubuntu
-
-ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=humble
-ENV WS_DIR=/root/ros2_ws
-
-RUN sed -i "s|http://ports.ubuntu.com/ubuntu-ports|${UBUNTU_PORTS_MIRROR}|g" /etc/apt/sources.list && \
-    sed -i "s|http://packages.ros.org/ros2/ubuntu|${ROS_MIRROR}|g" /etc/apt/sources.list.d/ros2.sources && \
-    sed -i "s|Types: deb deb-src|Types: deb|g" /etc/apt/sources.list.d/ros2.sources
+ENV WS_DIR=/home/ros/ros2_ws
+ENV LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cmake git \
-    python3-rosdep python3-pip \
-    libeigen3-dev libpcl-dev libssl-dev
-
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
-    ros-humble-pcl-ros ros-humble-pcl-conversions \
-    ros-humble-tf2 ros-humble-tf2-ros ros-humble-tf2-sensor-msgs \
-    ros-humble-tf2-geometry-msgs ros-humble-tf2-eigen \
-    ros-humble-eigen3-cmake-module
-
-RUN rosdep init || echo "rosdep already initialized" && \
-    rosdep update || rosdep update || true
+    libeigen3-dev \
+    libpcl-dev \
+    libssl-dev \
+    ros-humble-eigen3-cmake-module \
+    ros-humble-pcl-conversions \
+    ros-humble-pcl-ros \
+    ros-humble-tf2 \
+    ros-humble-tf2-eigen \
+    ros-humble-tf2-geometry-msgs \
+    ros-humble-tf2-ros \
+    ros-humble-tf2-sensor-msgs
 
 WORKDIR /opt/livox-src
 COPY lidar_connector/Livox-SDK2 ./Livox-SDK2
@@ -84,5 +72,25 @@ if 'Eigen3::Eigen' not in ros2:
 path.write_text(before + ros2)
 PY
 
+WORKDIR /opt/livox-src/Livox-SDK2
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build --parallel 4 && \
+    cmake --install build && \
+    ldconfig
+
 WORKDIR ${WS_DIR}
-SHELL ["/bin/bash", "-c"]
+RUN arch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)" && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    colcon build \
+    --packages-select livox_ros_driver2 fast_lio \
+    --cmake-args \
+    -DOPENSSL_ROOT_DIR=/usr \
+    -DOPENSSL_SSL_LIBRARY=/usr/lib/${arch}/libssl.so \
+    -DOPENSSL_CRYPTO_LIBRARY=/usr/lib/${arch}/libcrypto.so \
+    --parallel-workers 4
+
+COPY dockerfiles/assets/ros_entrypoint.sh /ros_entrypoint.sh
+RUN chmod +x /ros_entrypoint.sh
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["bash"]
