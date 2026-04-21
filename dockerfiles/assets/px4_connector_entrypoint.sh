@@ -16,7 +16,7 @@ OUTPUT_MODE="${OUTPUT_MODE:-topic}"
 
 case "$OUTPUT_MODE" in
     topic)
-        LAUNCH_FILE="px4_connector_imu_topic_only.launch.py"
+        LAUNCH_FILE="px4_connector_topic.launch.py"
         ;;
     socket)
         LAUNCH_FILE="px4_connector_socket.launch.py"
