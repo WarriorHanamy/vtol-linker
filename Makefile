@@ -106,21 +106,21 @@ docker-build-calib-jetson: check-network
 	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build --network=host -f $(CALIB_REMOTE_BUILD_DIR)/dockerfiles/calib_lidar_imu_init.native.Dockerfile --build-arg PREP_IMAGE=$(CALIB_PREP_IMAGE) -t $(CALIB_IMAGE) $(CALIB_REMOTE_BUILD_DIR)"
 
 
-.PHONY: docker-run-lio-jetson
-docker-run-lio-jetson:
+.PHONY: docker-test-lio-jetson
+docker-test-lio-jetson:
 	$(DOCKER) run --rm \
 		--net=host \
 		--ipc=host \
 		$(LIO_IMAGE)
 
-.PHONY: check-bag docker-run-calib-jetson
+.PHONY: check-bag docker-test-calib-jetson
 check-bag:
 	@if [ -z "$(strip $(BAG))" ]; then \
-		echo "BAG is required. Usage: make docker-run-calib-jetson BAG=calibration.bag"; \
+		echo "BAG is required. Usage: make docker-test-calib-jetson BAG=calibration.bag"; \
 		exit 1; \
 	fi
 
-docker-run-calib-jetson: check-bag
+docker-test-calib-jetson: check-bag
 	@mkdir -p $(DATA_DIR)
 	$(DOCKER) run --rm \
 		--net=host \
@@ -133,8 +133,8 @@ docker-run-calib-jetson: check-bag
 		/data/$(BAG)
 
 
-.PHONY: docker-run-px4-connector-jetson
-docker-run-px4-connector-jetson:
+.PHONY: docker-test-px4-connector-jetson
+docker-test-px4-connector-jetson:
 	$(DOCKER) run --rm \
 		--net=host \
 		--ipc=host \
@@ -142,8 +142,8 @@ docker-run-px4-connector-jetson:
 		$(PX4_CONNECTOR_IMAGE)
 
 
-.PHONY: docker-run-px4-connector-jetson-shell
-docker-run-px4-connector-jetson-shell:
+.PHONY: docker-test-px4-connector-jetson-shell
+docker-test-px4-connector-jetson-shell:
 	$(DOCKER) run --rm -it \
 		--net=host \
 		--ipc=host \
