@@ -1,11 +1,12 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>imu_bridge</name>
-  <version>0.0.1</version>
-  <description>Bridge PX4 HighresIMU to a ROS 2 topic or Unix socket</description>
-  <maintainer email="todo@todo.todo">todo</maintainer>
-  <license>TODO</license>
+  <name>px4_connector</name>
+  <version>0.1.0</version>
+  <description>PX4 ROS2 bridge: IMU sender and visual odometry bridge</description>
+
+  <maintainer email="devnull@example.com">OpenCode</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -13,6 +14,8 @@
   <depend>rclcpp_components</depend>
   <depend>px4_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>Eigen3</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

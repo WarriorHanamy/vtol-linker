@@ -1,4 +1,4 @@
-#include "imu_bridge/imu_sender_component.hpp"
+#include "px4_connector/imu_sender_component.hpp"
 
 #include <cerrno>
 #include <cstring>
@@ -21,7 +21,7 @@ constexpr size_t kDefaultImuDepth = 40;
 
 } // namespace
 
-namespace imu_bridge {
+namespace px4_connector {
 
 ImuSenderComponent::ImuSenderComponent(const rclcpp::NodeOptions &options)
     : Node("imu_sender_node", options), input_qos_depth_(kDefaultImuDepth),
@@ -188,6 +188,6 @@ void ImuSenderComponent::imu_callback(
   }
 }
 
-} // namespace imu_bridge
+} // namespace px4_connector
 
-RCLCPP_COMPONENTS_REGISTER_NODE(imu_bridge::ImuSenderComponent)
+RCLCPP_COMPONENTS_REGISTER_NODE(px4_connector::ImuSenderComponent)

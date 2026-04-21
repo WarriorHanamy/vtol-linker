@@ -1,4 +1,4 @@
-#include "px4_odometry_bridge/px4_visual_odometry_bridge_component.hpp"
+#include "px4_connector/px4_visual_odometry_bridge_component.hpp"
 
 #include <cmath>
 #include <functional>
@@ -31,7 +31,7 @@ Eigen::Matrix3d flu_to_frd_matrix()
 
 }  // namespace
 
-namespace px4_odometry_bridge
+namespace px4_connector
 {
 
 Px4VisualOdometryBridgeComponent::Px4VisualOdometryBridgeComponent(
@@ -170,6 +170,6 @@ void Px4VisualOdometryBridgeComponent::handle_odometry(nav_msgs::msg::Odometry::
   publisher_->publish(std::move(output));
 }
 
-}  // namespace px4_odometry_bridge
+}  // namespace px4_connector
 
-RCLCPP_COMPONENTS_REGISTER_NODE(px4_odometry_bridge::Px4VisualOdometryBridgeComponent)
+RCLCPP_COMPONENTS_REGISTER_NODE(px4_connector::Px4VisualOdometryBridgeComponent)

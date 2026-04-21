@@ -6,11 +6,12 @@
 
 #include <Eigen/Dense>
 
+#include <geometry_msgs/msg/vector3.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <px4_msgs/msg/vehicle_odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-namespace px4_odometry_bridge
+namespace px4_connector
 {
 
 class Px4VisualOdometryBridgeComponent : public rclcpp::Node
@@ -34,4 +35,4 @@ private:
   rclcpp::Publisher<px4_msgs::msg::VehicleOdometry>::SharedPtr publisher_;
 };
 
-}  // namespace px4_odometry_bridge
+}  // namespace px4_connector

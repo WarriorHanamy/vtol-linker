@@ -10,7 +10,7 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <sys/un.h>
 
-namespace imu_bridge
+namespace px4_connector
 {
 
 class ImuSenderComponent : public rclcpp::Node
@@ -48,4 +48,4 @@ private:
   std::atomic<uint64_t> dropped_socket_messages_;
 };
 
-}  // namespace imu_bridge
+}  // namespace px4_connector

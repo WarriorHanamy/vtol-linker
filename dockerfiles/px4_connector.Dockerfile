@@ -31,8 +31,7 @@ WORKDIR ${WS_DIR}/src
 COPY px4_connector/px4_msgs ./px4_msgs
 COPY px4_connector/px4_msgs_overlay/CMakeLists.txt ./px4_msgs/CMakeLists.txt
 COPY px4_connector/px4_msgs_overlay/package.xml ./px4_msgs/package.xml
-COPY px4_connector/src/px4_odometry_bridge ./px4_odometry_bridge
-COPY px4_connector/src/imu_bridge ./imu_bridge
+COPY px4_connector/src ./px4_connector
 
 WORKDIR ${WS_DIR}
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
@@ -40,15 +39,13 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
   --packages-select px4_msgs \
   --parallel-workers 4
 
-
-WORKDIR ${WS_DIR}
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
   colcon build \
-  --packages-select px4_odometry_bridge imu_bridge \
+  --packages-select px4_connector \
   --parallel-workers 4
 
 COPY dockerfiles/assets/px4_connector_entrypoint.sh /px4_connector_entrypoint.sh
 RUN chmod +x /px4_connector_entrypoint.sh
 
 ENTRYPOINT ["/px4_connector_entrypoint.sh"]
-CMD ["ros2", "launch", "px4_odometry_bridge", "bridge.launch.py"]
+CMD ["ros2", "launch", "px4_connector", "px4_connector.launch.py"]
