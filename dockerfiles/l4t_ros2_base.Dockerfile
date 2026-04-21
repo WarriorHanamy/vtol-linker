@@ -6,7 +6,7 @@
 # =============================================================
 
 ARG BASE_IMAGE=nvcr.io/nvidia/l4t-base
-ARG JETPACK_TAG=r36.4.0
+ARG JETPACK_TAG=r36.2.0
 FROM ${BASE_IMAGE}:${JETPACK_TAG}
 SHELL ["/bin/bash", "-c"]
 
