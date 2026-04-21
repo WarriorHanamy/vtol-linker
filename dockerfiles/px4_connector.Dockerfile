@@ -48,4 +48,4 @@ COPY dockerfiles/assets/px4_connector_entrypoint.sh /px4_connector_entrypoint.sh
 RUN chmod +x /px4_connector_entrypoint.sh
 
 ENTRYPOINT ["/px4_connector_entrypoint.sh"]
-CMD ["ros2", "launch", "px4_connector", "px4_connector.launch.py"]
+CMD []

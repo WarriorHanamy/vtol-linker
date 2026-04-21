@@ -10,8 +10,6 @@ from launch_ros.descriptions import ComposableNode
 
 def generate_launch_description():
     socket_path = LaunchConfiguration("socket_path")
-    output_mode = LaunchConfiguration("output_mode")
-    output_topic = LaunchConfiguration("output_topic")
 
     px4_container = ComposableNodeContainer(
         package="rclcpp_components",
@@ -21,13 +19,11 @@ def generate_launch_description():
         composable_node_descriptions=[
             ComposableNode(
                 package="px4_connector",
-                plugin="px4_connector::ImuSenderComponent",
-                name="imu_sender",
+                plugin="px4_connector::ImuSocketSenderComponent",
+                name="imu_socket_sender",
                 parameters=[
                     {
                         "socket_path": socket_path,
-                        "output_mode": output_mode,
-                        "output_topic": output_topic,
                     }
                 ],
             ),
@@ -35,12 +31,6 @@ def generate_launch_description():
                 package="px4_connector",
                 plugin="px4_connector::Px4VisualOdometryBridgeComponent",
                 name="px4_visual_odometry_bridge",
-                parameters=[
-                    {
-                        "input_topic": "/Odometry",
-                        "output_topic": "/fmu/in/vehicle_visual_odometry",
-                    }
-                ],
             ),
         ],
         output="screen",
@@ -49,8 +39,6 @@ def generate_launch_description():
     return launch.LaunchDescription(
         [
             DeclareLaunchArgument("socket_path", default_value="/tmp/imu_bridge.sock"),
-            DeclareLaunchArgument("output_mode", default_value="topic"),
-            DeclareLaunchArgument("output_topic", default_value="/px4/imu"),
             px4_container,
         ]
     )
