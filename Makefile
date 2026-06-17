@@ -69,25 +69,25 @@ docker-build-base-jetson: check-network
 	@echo "[1/2] Shipping build context to $(DEVICE_USER)@$(DEVICE_IP)..."
 	$(call ship-context-to-device,$(BASE_REMOTE_BUILD_DIR),$(BASE_CONTEXT_FILES))
 	@echo "[2/2] Building shared L4T ROS2 base image on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(BASE_REMOTE_BUILD_DIR) && docker build --network=host --build-arg JETPACK_TAG=$(JETPACK_TAG) --build-arg BASE_IMAGE=$(L4T_BASE_IMAGE) -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(BASE_REMOTE_BUILD_DIR) && sudo docker build --network=host --build-arg JETPACK_TAG=$(JETPACK_TAG) --build-arg BASE_IMAGE=$(L4T_BASE_IMAGE) -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
 
 .PHONY: docker-build-lio-jetson
 docker-build-lio-jetson: check-network
 	@echo "[1/3] Shipping build context to $(DEVICE_USER)@$(DEVICE_IP)..."
 	$(call ship-context-to-device,$(LIO_REMOTE_BUILD_DIR),$(LIO_CONTEXT_FILES))
 	@echo "[2/3] Building shared L4T ROS2 base image on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(LIO_REMOTE_BUILD_DIR) && docker build --network=host --build-arg JETPACK_TAG=$(JETPACK_TAG) --build-arg BASE_IMAGE=$(L4T_BASE_IMAGE) -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(LIO_REMOTE_BUILD_DIR) && sudo docker build --network=host --build-arg JETPACK_TAG=$(JETPACK_TAG) --build-arg BASE_IMAGE=$(L4T_BASE_IMAGE) -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
 	@echo "[3/3] Building final LIO image natively on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(LIO_REMOTE_BUILD_DIR) && docker build --network=host -f dockerfiles/lio.Dockerfile --build-arg BASE_IMAGE=$(ROS2_BASE_IMAGE) -t $(LIO_IMAGE) ."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(LIO_REMOTE_BUILD_DIR) && sudo docker build --network=host -f dockerfiles/lio.Dockerfile --build-arg BASE_IMAGE=$(ROS2_BASE_IMAGE) -t $(LIO_IMAGE) ."
 
 .PHONY: docker-build-px4-connector-jetson
 docker-build-px4-connector-jetson: check-network
 	@echo "[1/3] Shipping build context to $(DEVICE_USER)@$(DEVICE_IP)..."
 	$(call ship-context-to-device,$(PX4_CONNECTOR_REMOTE_BUILD_DIR),$(PX4_CONNECTOR_CONTEXT_FILES))
 	@echo "[2/3] Building shared L4T ROS2 base image on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(PX4_CONNECTOR_REMOTE_BUILD_DIR) && docker build --network=host --build-arg JETPACK_TAG=$(JETPACK_TAG) --build-arg BASE_IMAGE=$(L4T_BASE_IMAGE) -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(PX4_CONNECTOR_REMOTE_BUILD_DIR) && sudo docker build --network=host --build-arg JETPACK_TAG=$(JETPACK_TAG) --build-arg BASE_IMAGE=$(L4T_BASE_IMAGE) -f dockerfiles/l4t_ros2_base.Dockerfile -t $(ROS2_BASE_IMAGE) ."
 	@echo "[3/3] Building final PX4 image natively on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(PX4_CONNECTOR_REMOTE_BUILD_DIR) && docker build --network=host -f dockerfiles/px4_connector.Dockerfile --build-arg BASE_IMAGE=$(ROS2_BASE_IMAGE) -t $(PX4_CONNECTOR_IMAGE) ."
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "cd $(PX4_CONNECTOR_REMOTE_BUILD_DIR) && sudo docker build --network=host -f dockerfiles/px4_connector.Dockerfile --build-arg BASE_IMAGE=$(ROS2_BASE_IMAGE) -t $(PX4_CONNECTOR_IMAGE) ."
 
 
 .PHONY: docker-build-calib-jetson
@@ -105,9 +105,9 @@ docker-build-calib-jetson: check-network
 	@echo "[2/4] Shipping calibration prep image and native Dockerfile to $(DEVICE_USER)@$(DEVICE_IP)..."
 	$(call ship-calib-native-to-device,$(CALIB_PREP_ARCHIVE),$(CALIB_REMOTE_BUILD_DIR))
 	@echo "[3/4] Loading calibration prep image on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker load -i $(REMOTE_DIR)/$(notdir $(CALIB_PREP_ARCHIVE))"
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "sudo docker load -i $(REMOTE_DIR)/$(notdir $(CALIB_PREP_ARCHIVE))"
 	@echo "[4/4] Building final calibration image natively on Jetson..."
-	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "docker build --network=host -f $(CALIB_REMOTE_BUILD_DIR)/dockerfiles/calib_lidar_imu_init.native.Dockerfile --build-arg PREP_IMAGE=$(CALIB_PREP_IMAGE) -t $(CALIB_IMAGE) $(CALIB_REMOTE_BUILD_DIR)"
+	@ssh $(SSH_OPTS) $(DEVICE_USER)@$(DEVICE_IP) "sudo docker build --network=host -f $(CALIB_REMOTE_BUILD_DIR)/dockerfiles/calib_lidar_imu_init.native.Dockerfile --build-arg PREP_IMAGE=$(CALIB_PREP_IMAGE) -t $(CALIB_IMAGE) $(CALIB_REMOTE_BUILD_DIR)"
 
 
 .PHONY: docker-test-lio-jetson
