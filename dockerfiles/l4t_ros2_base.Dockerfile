@@ -45,7 +45,6 @@ RUN sed -i "s|http://ports.ubuntu.com/ubuntu-ports|${UBUNTU_PORTS_MIRROR}|g" /et
   sed -i "s|Types: deb deb-src|Types: deb|g" /etc/apt/sources.list.d/ros2.list || true
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
   apt-get update && apt-get install -y --no-install-recommends \
   build-essential \
   cmake \
