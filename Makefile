@@ -5,8 +5,8 @@ IMAGE_SUFFIX ?= jetson
 DATA_DIR ?= $(CURDIR)/data
 
 # L4T version — override at build time, e.g. make docker-build-base-jetson JETPACK_TAG=r36.2.0
-JETPACK_TAG ?= r35.5.0
-L4T_BASE_IMAGE ?= nvcr.io/nvidia/l4t-base
+JETPACK_TAG ?= r35.4.1
+L4T_BASE_IMAGE ?= nvcr.io/nvidia/l4t-jetpack
 
 BAG ?=
 LAUNCH ?= calib_with_imu.launch

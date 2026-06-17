@@ -9,8 +9,8 @@
 # ROS2 repo needed.
 # =============================================================
 
-ARG BASE_IMAGE=nvcr.io/nvidia/l4t-base
-ARG JETPACK_TAG=r35.5.0
+ARG BASE_IMAGE=nvcr.io/nvidia/l4t-jetpack
+ARG JETPACK_TAG=r35.4.1
 FROM ${BASE_IMAGE}:${JETPACK_TAG}
 SHELL ["/bin/bash", "-c"]
 
