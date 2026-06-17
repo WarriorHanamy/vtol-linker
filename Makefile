@@ -41,6 +41,30 @@ PX4_CONNECTOR_CONTEXT_FILES := dockerfiles px4_connector
 CALIB_NATIVE_CONTEXT_FILES := dockerfiles
 
 # ==============================================================================
+# Pre-flight check (local, no device needed)
+# ==============================================================================
+
+.PHONY: check
+
+check:
+	@echo "=== [linker] NGC base image ==="
+	@echo -n "  $(ROS2_BASE_IMAGE) << $(L4T_BASE_IMAGE):$(JETPACK_TAG) => "; \
+	  docker manifest inspect $(L4T_BASE_IMAGE):$(JETPACK_TAG) >/dev/null 2>&1 \
+	  && echo "EXISTS" || echo "NOT FOUND"
+	@echo ""
+	@echo "=== [linker] BuildKit available ==="
+	@echo -n "  local: "; docker buildx version 2>/dev/null && echo "OK" || echo "MISSING"
+	@echo ""
+	@echo "=== [linker] Makefile variables ==="
+	@echo "  JETPACK_TAG  = $(JETPACK_TAG)"
+	@echo "  BASE_IMAGE   = $(L4T_BASE_IMAGE)"
+	@echo "  ROS2_IMAGE   = $(ROS2_BASE_IMAGE)"
+	@echo "  LIO_IMAGE    = $(LIO_IMAGE)"
+	@echo "  PX4_IMAGE    = $(PX4_CONNECTOR_IMAGE)"
+	@echo ""
+	@echo "Run 'make docker-build-base-jetson' to build the base image on Jetson"
+
+# ==============================================================================
 # Shipping macro
 # ==============================================================================
 # ship-context-to-device: copy only required build context to device
